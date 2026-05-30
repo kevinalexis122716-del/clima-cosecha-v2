@@ -16,10 +16,6 @@ function setCache(key: string, data: unknown) {
   cache[key] = { data, ts: Date.now() }
 }
 
-// Open-Meteo — fuente primaria y exclusiva para precipitación y probabilidad horaria.
-// hourly.precipitation[i] = mm totales esperados para esa hora completa.
-// hourly.precipitation_probability[i] = probabilidad para esa hora (0-100).
-// Temperatura, humedad y viento también se toman aquí para coherencia.
 async function getHorarioOpenMeteo(lat: number, lng: number) {
   const cacheKey = `openmeteo-pronostico-${lat}-${lng}`
   const cached = getCache(cacheKey)
@@ -34,22 +30,25 @@ async function getHorarioOpenMeteo(lat: number, lng: number) {
     )
     if (!res.ok) return null
     const data = await res.json()
-    const resultado = data.hourly.time.slice(0, 24).map((t: string, i: number) => ({
+
+    // Encontrar el índice de la hora actual en Colombia para empezar desde ahí
+    const ahoraISO = new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).slice(0, 13)
+    const idxActual = data.hourly.time.findIndex((t: string) => t.slice(0, 13) === ahoraISO)
+    const inicio = idxActual >= 0 ? idxActual : 0
+
+    const resultado = data.hourly.time.slice(inicio, inicio + 24).map((t: string, i: number) => ({
       hora: t,
-      temp: Math.round(data.hourly.temperature_2m[i] * 10) / 10,
-      // mm esperados para esa hora completa — dato accionable para cosecha
-      precipitacion: parseFloat((data.hourly.precipitation[i] ?? 0).toFixed(2)),
-      probabilidad: data.hourly.precipitation_probability[i] ?? 0,
-      humedad: Math.round(data.hourly.relative_humidity_2m[i]),
-      viento: Math.round(data.hourly.wind_speed_10m[i] * 10) / 10,
+      temp: Math.round(data.hourly.temperature_2m[inicio + i] * 10) / 10,
+      precipitacion: parseFloat((data.hourly.precipitation[inicio + i] ?? 0).toFixed(2)),
+      probabilidad: data.hourly.precipitation_probability[inicio + i] ?? 0,
+      humedad: Math.round(data.hourly.relative_humidity_2m[inicio + i]),
+      viento: Math.round(data.hourly.wind_speed_10m[inicio + i] * 10) / 10,
     }))
     setCache(cacheKey, resultado)
     return resultado
   } catch { return null }
 }
 
-// Tomorrow.io — solo para temperatura, humedad y viento como complemento opcional.
-// Su precipitationIntensity (mm/h tasa) NO se usa para nada en este endpoint.
 async function getHorarioTomorrow(lat: number, lng: number) {
   const cacheKey = `tomorrow-pronostico-${lat}-${lng}`
   const cached = getCache(cacheKey)
@@ -67,7 +66,6 @@ async function getHorarioTomorrow(lat: number, lng: number) {
       temp: Math.round(h.values.temperature * 10) / 10,
       humedad: Math.round(h.values.humidity),
       viento: Math.round(h.values.windSpeed * 10) / 10,
-      // precipitationIntensity deliberadamente excluido — es tasa mm/h, no acumulado por hora
     }))
     setCache(cacheKey, resultado)
     return resultado
@@ -92,7 +90,6 @@ async function getDiarioOpenMeteo(lat: number, lng: number) {
       fecha,
       tempMax: Math.round(data.daily.temperature_2m_max[i] * 10) / 10,
       tempMin: Math.round(data.daily.temperature_2m_min[i] * 10) / 10,
-      // precipitation_sum = mm totales del día — coherente con los datos horarios
       precipitacion: parseFloat((data.daily.precipitation_sum[i] ?? 0).toFixed(2)),
       probabilidad: data.daily.precipitation_probability_max[i] ?? 0,
       viento: Math.round(data.daily.wind_speed_10m_max[i] * 10) / 10,
@@ -114,22 +111,16 @@ export async function GET(request: Request) {
     getDiarioOpenMeteo(lat, lng),
   ])
 
-  // Open-Meteo es obligatorio — es la única fuente de mm y probabilidad horarios
   if (!openmeteo) {
     return NextResponse.json({ error: 'Pronóstico no disponible — Open-Meteo sin respuesta' }, { status: 500 })
   }
 
-  // Combinar: precipitación y probabilidad siempre de Open-Meteo.
-  // Temperatura, humedad y viento: si Tomorrow está disponible, promediar para mayor precisión.
-  // Si no está, usar Open-Meteo solo.
   const horarioFinal = openmeteo.map((om: Record<string, number | string>, i: number) => {
     const tw = tomorrow?.[i]
     return {
       hora: om.hora,
-      // Precipitación y probabilidad: SOLO Open-Meteo, sin mezclas
       precipitacion: om.precipitacion,
       probabilidad: om.probabilidad,
-      // Temperatura, humedad, viento: promedio simple si hay Tomorrow disponible
       temp: tw
         ? parseFloat((((Number(om.temp) + Number(tw.temp)) / 2)).toFixed(1))
         : om.temp,
