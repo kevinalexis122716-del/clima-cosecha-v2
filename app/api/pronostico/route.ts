@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-
+ 
 const TOMORROW_KEY = process.env.TOMORROW_API_KEY
-
+ 
 // Cache en memoria compartido
 const cache: Record<string, { data: unknown; ts: number }> = {}
 const CACHE_TTL = 3600000 // 1 hora
-
+ 
 function getCache(key: string) {
   const entry = cache[key]
   if (!entry) return null
@@ -15,12 +15,12 @@ function getCache(key: string) {
 function setCache(key: string, data: unknown) {
   cache[key] = { data, ts: Date.now() }
 }
-
+ 
 async function getHorarioOpenMeteo(lat: number, lng: number) {
   const cacheKey = `openmeteo-pronostico-${lat}-${lng}`
   const cached = getCache(cacheKey)
   if (cached) return cached as Record<string, number | string>[]
-
+ 
   try {
     const res = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
@@ -30,12 +30,13 @@ async function getHorarioOpenMeteo(lat: number, lng: number) {
     )
     if (!res.ok) return null
     const data = await res.json()
-
+ 
     // Encontrar el índice de la hora actual en Colombia para empezar desde ahí
-    const ahoraISO = new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' }).slice(0, 13)
+    const ahoraStr = new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' })
+    const ahoraISO = ahoraStr.slice(0, 10) + 'T' + ahoraStr.slice(11, 13)
     const idxActual = data.hourly.time.findIndex((t: string) => t.slice(0, 13) === ahoraISO)
     const inicio = idxActual >= 0 ? idxActual : 0
-
+ 
     const resultado = data.hourly.time.slice(inicio, inicio + 24).map((t: string, i: number) => ({
       hora: t,
       temp: Math.round(data.hourly.temperature_2m[inicio + i] * 10) / 10,
@@ -48,12 +49,12 @@ async function getHorarioOpenMeteo(lat: number, lng: number) {
     return resultado
   } catch { return null }
 }
-
+ 
 async function getHorarioTomorrow(lat: number, lng: number) {
   const cacheKey = `tomorrow-pronostico-${lat}-${lng}`
   const cached = getCache(cacheKey)
   if (cached) return cached as Record<string, number | string>[]
-
+ 
   try {
     const res = await fetch(
       `https://api.tomorrow.io/v4/weather/forecast?location=${lat},${lng}&apikey=${TOMORROW_KEY}&units=metric&timesteps=1h`,
@@ -71,12 +72,12 @@ async function getHorarioTomorrow(lat: number, lng: number) {
     return resultado
   } catch { return null }
 }
-
+ 
 async function getDiarioOpenMeteo(lat: number, lng: number) {
   const cacheKey = `openmeteo-diario-${lat}-${lng}`
   const cached = getCache(cacheKey)
   if (cached) return cached as Record<string, number | string>[]
-
+ 
   try {
     const res = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
@@ -99,22 +100,22 @@ async function getDiarioOpenMeteo(lat: number, lng: number) {
     return resultado
   } catch { return null }
 }
-
+ 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const lat = parseFloat(searchParams.get('lat') || '3.9038')
   const lng = parseFloat(searchParams.get('lng') || '-76.2982')
-
+ 
   const [openmeteo, tomorrow, diario] = await Promise.all([
     getHorarioOpenMeteo(lat, lng),
     getHorarioTomorrow(lat, lng),
     getDiarioOpenMeteo(lat, lng),
   ])
-
+ 
   if (!openmeteo) {
     return NextResponse.json({ error: 'Pronóstico no disponible — Open-Meteo sin respuesta' }, { status: 500 })
   }
-
+ 
   const horarioFinal = openmeteo.map((om: Record<string, number | string>, i: number) => {
     const tw = tomorrow?.[i]
     return {
@@ -132,7 +133,7 @@ export async function GET(request: Request) {
         : om.viento,
     }
   })
-
+ 
   return NextResponse.json({
     horario: horarioFinal,
     diario: diario || [],
