@@ -16,12 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={dmSans.className} style={{
-        margin: 0,
-        padding: 0,
-        background: '#f1f5f9',
-        minHeight: '100vh',
-      }}>
+      <body className={`${dmSans.className} bg-slate-50 min-h-screen m-0 p-0`}>
         {children}
       </body>
     </html>
