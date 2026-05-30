@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import useSWR from 'swr'
 import Image from 'next/image'
-import { MapPin, Calendar, Clock, Menu, Bell } from 'lucide-react'
+import { MapPin, Calendar, Clock } from 'lucide-react'
 import Sidebar from '@/components/Sidebar'
 import CondicionWidget from '@/components/CondicionWidget'
 
@@ -94,23 +94,14 @@ export default function Home() {
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         
-        {/* TOPBAR MÓVIL (Solo visible en celular) */}
-        <div className="flex md:hidden items-center justify-between bg-white px-4 py-3 border-b border-slate-200 shrink-0">
-          <div className="flex items-center gap-3">
-            <button className="text-slate-500"><Menu size={22} /></button>
-            <div className="flex items-center gap-2">
-              <Image src="/iconos/probabilidad.png" alt="logo" width={28} height={28} style={{ objectFit: 'contain' }} />
-              <div>
-                <div className="font-bold text-[0.95rem] text-slate-900 leading-tight">Clima Cosecha</div>
-                <div className="text-[0.65rem] text-slate-400 leading-tight">Monitoreo agroclimático</div>
-              </div>
+        {/* TOPBAR MÓVIL (Alineado a la izquierda, justo donde empezaban las rayas) */}
+        <div className="flex md:hidden items-center justify-start bg-white px-4 py-3 border-b border-slate-200 shrink-0">
+          <div className="flex items-center gap-2">
+            <Image src="/iconos/probabilidad.png" alt="logo" width={28} height={28} style={{ objectFit: 'contain' }} />
+            <div>
+              <div className="font-bold text-[0.95rem] text-slate-900 leading-tight">Clima Cosecha</div>
+              <div className="text-[0.65rem] text-slate-400 leading-tight">Monitoreo agroclimático</div>
             </div>
-          </div>
-          <div className="relative">
-            <Bell size={22} className="text-slate-500" />
-            {alertasCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[0.6rem] font-bold px-[5px] py-[1px] rounded-full">{alertasCount}</span>
-            )}
           </div>
         </div>
 
