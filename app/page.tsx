@@ -50,7 +50,7 @@ function getIconoCondicion(mm: number, prob: number) {
 
 export default function Home() {
   const [coords, setCoords] = useState({ lat: 3.9038, lng: -76.2982 })
-  const [lugar, setLugar] = useState('Tuluá')
+  const [lugar, setLugar] = useState('Buga')
   const [, setSidebarCollapsed] = useState(false)
 
   const { data: clima, isLoading: loadingClima } = useSWR(
