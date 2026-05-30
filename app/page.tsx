@@ -49,7 +49,7 @@ function getIconoCondicion(mm: number, prob: number) {
 }
 
 export default function Home() {
-  const [coords, setCoords] = useState({ lat: 3.9038, lng: -76.2982 })
+  const [coords, setCoords] = useState({ lat: 3.9044, lng: -76.2960 })
   const [lugar, setLugar] = useState('Buga')
   const [, setSidebarCollapsed] = useState(false)
 
