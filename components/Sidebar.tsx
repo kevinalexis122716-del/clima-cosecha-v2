@@ -9,23 +9,24 @@ import { LayoutDashboard, CloudRain, Bell, ChevronLeft, ChevronRight } from 'luc
 interface SidebarProps {
   alertasCount?: number
   onToggle?: (collapsed: boolean) => void
+  ultimaActualizacion?: string
 }
 
-export default function Sidebar({ alertasCount = 0, onToggle }: SidebarProps) {
+export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacion }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const [minutos, setMinutos] = useState(0)
 
   useEffect(() => {
-    setMinutos(0)
-    const intervalo = setInterval(() => {
-      setMinutos(m => {
-        if (m >= 19) return 0
-        return m + 1
-      })
-    }, 60000) // cada minuto
+    function calcular() {
+      if (!ultimaActualizacion) return
+      const diff = Math.floor((Date.now() - new Date(ultimaActualizacion).getTime()) / 60000)
+      setMinutos(Math.min(diff, 20))
+    }
+    calcular()
+    const intervalo = setInterval(calcular, 60000)
     return () => clearInterval(intervalo)
-  }, [])
+  }, [ultimaActualizacion])
 
   const toggle = () => {
     const next = !collapsed
@@ -194,7 +195,11 @@ export default function Sidebar({ alertasCount = 0, onToggle }: SidebarProps) {
                 color: minutos >= 15 ? '#c2410c' : '#15803d',
                 fontWeight: 600,
               }}>
-                {minutos === 0 ? 'Actualizado ahora' : `Hace ${minutos} min`}
+                {!ultimaActualizacion
+                  ? 'Cargando...'
+                  : minutos === 0
+                  ? 'Actualizado ahora'
+                  : `Hace ${minutos} min`}
               </span>
             </div>
           </div>
