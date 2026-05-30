@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, CloudRain, Bell, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -14,6 +14,18 @@ interface SidebarProps {
 export default function Sidebar({ alertasCount = 0, onToggle }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
+  const [minutos, setMinutos] = useState(0)
+
+  useEffect(() => {
+    setMinutos(0)
+    const intervalo = setInterval(() => {
+      setMinutos(m => {
+        if (m >= 19) return 0
+        return m + 1
+      })
+    }, 60000) // cada minuto
+    return () => clearInterval(intervalo)
+  }, [])
 
   const toggle = () => {
     const next = !collapsed
@@ -51,7 +63,6 @@ export default function Sidebar({ alertasCount = 0, onToggle }: SidebarProps) {
         gap: '8px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-          {/* ICONO — usa la imagen de probabilidad de lluvia */}
           <div style={{
             width: '36px', height: '36px', flexShrink: 0,
             borderRadius: '10px',
@@ -74,7 +85,6 @@ export default function Sidebar({ alertasCount = 0, onToggle }: SidebarProps) {
           )}
         </div>
 
-        {/* BOTÓN TOGGLE */}
         <button onClick={toggle} style={{
           width: '26px', height: '26px', flexShrink: 0,
           background: '#f1f5f9',
@@ -152,7 +162,7 @@ export default function Sidebar({ alertasCount = 0, onToggle }: SidebarProps) {
         })}
       </nav>
 
-      {/* USUARIO — avatar oculto, solo texto visible */}
+      {/* USUARIO */}
       <div style={{
         padding: collapsed ? '14px 0' : '14px 12px',
         borderTop: '1px solid #e2e8f0',
@@ -161,9 +171,32 @@ export default function Sidebar({ alertasCount = 0, onToggle }: SidebarProps) {
         justifyContent: collapsed ? 'center' : 'flex-start',
       }}>
         {!collapsed && (
-          <div>
+          <div style={{ width: '100%' }}>
             <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0f172a' }}>Kevin Sanchez</div>
-            <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Desarrollador</div>
+            <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginBottom: '6px' }}>Desarrollador</div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: minutos >= 15 ? '#fff7ed' : '#f0fdf4',
+              border: `1px solid ${minutos >= 15 ? '#fed7aa' : '#bbf7d0'}`,
+              borderRadius: '8px',
+              padding: '4px 8px',
+            }}>
+              <span style={{
+                width: '6px', height: '6px',
+                background: minutos >= 15 ? '#f97316' : '#10b981',
+                borderRadius: '50%',
+                flexShrink: 0,
+              }} />
+              <span style={{
+                fontSize: '0.62rem',
+                color: minutos >= 15 ? '#c2410c' : '#15803d',
+                fontWeight: 600,
+              }}>
+                {minutos === 0 ? 'Actualizado ahora' : `Hace ${minutos} min`}
+              </span>
+            </div>
           </div>
         )}
       </div>
