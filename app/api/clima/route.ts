@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 const TOMORROW_KEY = process.env.TOMORROW_API_KEY
 const WEATHERAPI_KEY = process.env.WEATHERAPI_KEY
 
+// Tomorrow.io — variables meteorológicas generales (temperatura, viento, presión, etc.)
+// NO se usa su precipitationIntensity porque es tasa mm/h, no acumulado real de la hora.
 async function getTomorrow(lat: number, lng: number) {
   try {
     const res = await fetch(
@@ -20,17 +22,21 @@ async function getTomorrow(lat: number, lng: number) {
       direccionViento: v.windDirection,
       presion: v.pressureSurfaceLevel,
       visibilidad: v.visibility,
-      precipitacion: v.precipitationIntensity,
-      probabilidad: v.precipitationProbability,
-      fuente: 'tomorrow'
+      fuente: 'tomorrow',
     }
   } catch { return null }
 }
 
+// Open-Meteo — fuente exclusiva de precipitación y probabilidad.
+// "precipitation" en el campo current = mm acumulados en la hora en curso (dato real, no tasa).
+// "precipitation_probability" = probabilidad para el período actual.
 async function getOpenMeteo(lat: number, lng: number) {
   try {
     const res = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,surface_pressure,visibility,precipitation_probability&wind_speed_unit=kmh&timezone=America%2FBogota`,
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,` +
+      `wind_speed_10m,wind_direction_10m,surface_pressure,visibility,precipitation_probability,uv_index` +
+      `&wind_speed_unit=kmh&timezone=America%2FBogota`,
       { next: { revalidate: 600 } }
     )
     if (!res.ok) return null
@@ -44,13 +50,17 @@ async function getOpenMeteo(lat: number, lng: number) {
       direccionViento: c.wind_direction_10m,
       presion: c.surface_pressure,
       visibilidad: c.visibility / 1000,
-      precipitacion: c.precipitation,
-      probabilidad: c.precipitation_probability,
-      fuente: 'openmeteo'
+      // Precipitación acumulada en la hora en curso — dato correcto para toma de decisiones
+      precipitacion: c.precipitation ?? 0,
+      probabilidad: c.precipitation_probability ?? 0,
+      uvIndex: c.uv_index ?? null,
+      fuente: 'openmeteo',
     }
   } catch { return null }
 }
 
+// WeatherAPI — solo como fallback para variables meteorológicas generales.
+// Su precip_mm NO se usa; su probabilidad siempre es 0 (la API no lo entrega).
 async function getWeatherApi(lat: number, lng: number) {
   try {
     const res = await fetch(
@@ -68,20 +78,18 @@ async function getWeatherApi(lat: number, lng: number) {
       direccionViento: c.wind_degree,
       presion: c.pressure_mb,
       visibilidad: c.vis_km,
-      precipitacion: c.precip_mm,
-      probabilidad: 0,
-      fuente: 'weatherapi'
+      fuente: 'weatherapi',
     }
   } catch { return null }
 }
 
 function getImpacto(mm: number) {
-  if (mm <= 0.5) return { nivel: 'Sin impacto', color: '#10b981', bg: '#ecfdf5', porcentaje: 10, descripcion: 'Condiciones ideales para operación de cosecha. Sin restricciones.' }
-  if (mm <= 2) return { nivel: 'Bajo', color: '#84cc16', bg: '#f7fee7', porcentaje: 25, descripcion: 'Operación normal. Monitoreo rutinario recomendado.' }
-  if (mm <= 5) return { nivel: 'Moderado', color: '#f59e0b', bg: '#fffbeb', porcentaje: 50, descripcion: 'Reducir velocidad de maquinaria. Evitar zonas con pendiente.' }
-  if (mm <= 10) return { nivel: 'Alto', color: '#f97316', bg: '#fff7ed', porcentaje: 70, descripcion: 'Limitar tráfico pesado. Riesgo de compactación severa.' }
-  if (mm <= 20) return { nivel: 'Crítico', color: '#ef4444', bg: '#fef2f2', porcentaje: 88, descripcion: 'Suspender operaciones. Riesgo de saturación del suelo.' }
-  return { nivel: 'Extremo', color: '#7c3aed', bg: '#f5f3ff', porcentaje: 100, descripcion: 'Parada total. Evacuar maquinaria de zonas bajas.' }
+  if (mm <= 0.5) return { nivel: 'Sin impacto', color: '#10b981', bg: '#ecfdf5', porcentaje: 10,  descripcion: 'Condiciones ideales para operación de cosecha. Sin restricciones.' }
+  if (mm <= 2)   return { nivel: 'Bajo',        color: '#84cc16', bg: '#f7fee7', porcentaje: 25,  descripcion: 'Operación normal. Monitoreo rutinario recomendado.' }
+  if (mm <= 5)   return { nivel: 'Moderado',    color: '#f59e0b', bg: '#fffbeb', porcentaje: 50,  descripcion: 'Reducir velocidad de maquinaria. Evitar zonas con pendiente.' }
+  if (mm <= 10)  return { nivel: 'Alto',        color: '#f97316', bg: '#fff7ed', porcentaje: 70,  descripcion: 'Limitar tráfico pesado. Riesgo de compactación severa.' }
+  if (mm <= 20)  return { nivel: 'Crítico',     color: '#ef4444', bg: '#fef2f2', porcentaje: 88,  descripcion: 'Suspender operaciones. Riesgo de saturación del suelo.' }
+  return           { nivel: 'Extremo',          color: '#7c3aed', bg: '#f5f3ff', porcentaje: 100, descripcion: 'Parada total. Evacuar maquinaria de zonas bajas.' }
 }
 
 function getDireccionViento(grados: number): string {
@@ -100,33 +108,63 @@ export async function GET(request: Request) {
     getWeatherApi(lat, lng),
   ])
 
-  const principal = tomorrow || openmeteo || weatherapi
-  if (!principal) {
-    return NextResponse.json({ error: 'Sin datos disponibles' }, { status: 500 })
+  // Sin Open-Meteo no hay precipitación confiable — respondemos con advertencia explícita.
+  if (!openmeteo) {
+    const meteo = tomorrow || weatherapi
+    if (!meteo) {
+      return NextResponse.json({ error: 'Sin datos disponibles' }, { status: 500 })
+    }
+    const direccion = getDireccionViento(meteo.direccionViento)
+    return NextResponse.json({
+      temp: Math.round(meteo.temp * 10) / 10,
+      sensacion: Math.round(meteo.sensacion * 10) / 10,
+      humedad: Math.round(meteo.humedad),
+      viento: Math.round(meteo.viento * 10) / 10,
+      direccionViento: Math.round(meteo.direccionViento),
+      direccionTexto: direccion,
+      presion: Math.round(meteo.presion),
+      visibilidad: Math.round(meteo.visibilidad * 10) / 10,
+      precipitacion: null,
+      probabilidad: null,
+      impacto: null,
+      advertencia: 'Precipitación no disponible — Open-Meteo sin respuesta',
+      fuentes: {
+        tomorrow: tomorrow   ? 'ok' : 'error',
+        openmeteo: 'error',
+        weatherapi: weatherapi ? 'ok' : 'error',
+      },
+      timestamp: new Date().toISOString(),
+    })
   }
 
-  const precipitacion = tomorrow && openmeteo && weatherapi
-    ? parseFloat(((tomorrow.precipitacion * 0.45) + (openmeteo.precipitacion * 0.35) + (weatherapi.precipitacion * 0.20)).toFixed(2))
-    : principal.precipitacion
+  // Variables meteorológicas generales: Tomorrow primero, luego Open-Meteo, luego WeatherAPI.
+  const meteo = tomorrow || openmeteo || weatherapi!
 
-  const impacto = getImpacto(precipitacion)
-  const direccion = getDireccionViento(principal.direccionViento)
+  // Precipitación y probabilidad: SOLO Open-Meteo.
+  // precipitation = mm acumulados en la hora en curso (no es tasa mm/h).
+  const precipitacion = parseFloat(openmeteo.precipitacion.toFixed(2))
+  const probabilidad  = Math.round(openmeteo.probabilidad)
+
+  const impacto   = getImpacto(precipitacion)
+  const direccion = getDireccionViento(meteo.direccionViento)
 
   return NextResponse.json({
-    temp: Math.round(principal.temp * 10) / 10,
-    sensacion: Math.round(principal.sensacion * 10) / 10,
-    humedad: Math.round(principal.humedad),
-    viento: Math.round(principal.viento * 10) / 10,
-    direccionViento: Math.round(principal.direccionViento),
+    temp: Math.round(meteo.temp * 10) / 10,
+    sensacion: Math.round(meteo.sensacion * 10) / 10,
+    humedad: Math.round(meteo.humedad),
+    viento: Math.round(meteo.viento * 10) / 10,
+    direccionViento: Math.round(meteo.direccionViento),
     direccionTexto: direccion,
-    presion: Math.round(principal.presion),
-    visibilidad: Math.round(principal.visibilidad * 10) / 10,
+    presion: Math.round(meteo.presion),
+    visibilidad: Math.round(meteo.visibilidad * 10) / 10,
+    // mm acumulados en la hora en curso — dato confiable para cosecha de caña
     precipitacion,
-    probabilidad: Math.round(principal.probabilidad),
+    probabilidad,
+    uvIndex: openmeteo.uvIndex,
     impacto,
     fuentes: {
-      tomorrow: tomorrow ? 'ok' : 'error',
-      openmeteo: openmeteo ? 'ok' : 'error',
+      tomorrow:  tomorrow   ? 'ok' : 'error',
+      openmeteo: 'ok',
       weatherapi: weatherapi ? 'ok' : 'error',
     },
     timestamp: new Date().toISOString(),

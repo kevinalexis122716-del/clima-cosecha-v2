@@ -55,12 +55,12 @@ export default function Home() {
 
   const { data: clima, isLoading: loadingClima } = useSWR(
     `/api/clima?lat=${coords.lat}&lng=${coords.lng}`,
-    fetcher, { refreshInterval: 300000 }
+    fetcher, { refreshInterval: 1200000 }
   )
 
   const { data: pronostico, isLoading: loadingPron } = useSWR(
     `/api/pronostico?lat=${coords.lat}&lng=${coords.lng}`,
-    fetcher, { refreshInterval: 600000 }
+    fetcher, { refreshInterval: 1200000 }
   )
 
   const onClickMapa = useCallback(async (lat: number, lng: number) => {
@@ -76,8 +76,8 @@ export default function Home() {
     } catch { setLugar('Ubicación seleccionada') }
   }, [])
 
-  const horario = pronostico?.horario || []
-  const alertasCount = horario.filter((h: Record<string, number>) => h.precipitacion > 0.5).length
+  const horario: Record<string, number | string>[] = Array.isArray(pronostico?.horario) ? pronostico.horario : []
+  const alertasCount = horario.filter((h) => Number(h.precipitacion) > 0.5).length
 
   const kpis = [
     {
@@ -89,15 +89,19 @@ export default function Home() {
     },
     {
       label: 'PROB. LLUVIA',
-      valor: loadingClima ? '--' : `${clima?.probabilidad ?? '--'}%`,
-      sub: (clima?.probabilidad ?? 0) > 60 ? 'Alta' : (clima?.probabilidad ?? 0) > 30 ? 'Moderada' : 'Baja',
+      valor: loadingClima ? '--' : (clima?.probabilidad != null ? `${clima.probabilidad}%` : '--'),
+      sub: clima?.probabilidad == null
+        ? 'Sin datos'
+        : (clima.probabilidad > 60 ? 'Alta' : clima.probabilidad > 30 ? 'Moderada' : 'Baja'),
       icono: '/iconos/probabilidad.png',
       color: '#2563eb',
     },
     {
       label: 'PRECIPITACIÓN',
-      valor: loadingClima ? '--' : `${clima?.precipitacion ?? '--'} mm/h`,
-      sub: (clima?.precipitacion ?? 0) > 0.5 ? 'Lluvia activa' : 'Sin lluvia',
+      valor: loadingClima ? '--' : `${clima?.precipitacion ?? '--'} mm`,
+      sub: clima?.precipitacion == null
+        ? 'Sin datos'
+        : (clima.precipitacion > 0.5 ? 'Lluvia activa' : 'Sin lluvia'),
       icono: '/iconos/lluvia.png',
       color: getColorPrecip(clima?.precipitacion ?? 0),
     },
@@ -299,6 +303,7 @@ export default function Home() {
                   probabilidad={clima?.probabilidad ?? 0}
                   temp={clima?.temp ?? 25}
                   humedad={clima?.humedad ?? 60}
+                  uvIndex={clima?.uvIndex ?? null}
                 />
               </div>
             </div>

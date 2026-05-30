@@ -3,29 +3,33 @@
 import Image from 'next/image'
 
 interface CondicionWidgetProps {
-  precipitacion: number
-  probabilidad: number
+  precipitacion: number | null
+  probabilidad: number | null
   temp: number
   humedad: number
+  uvIndex: number | null
 }
 
-function getCondicion(precipitacion: number, probabilidad: number) {
-  if (precipitacion > 5) return {
+function getCondicion(precipitacion: number | null, probabilidad: number | null) {
+  const mm = precipitacion ?? 0
+  const prob = probabilidad ?? 0
+
+  if (mm > 5) return {
     label: 'Lluvioso',
     desc: 'Lluvia activa en la región',
     imagen: '/imagenes/lluvioso.jpg',
   }
-  if (precipitacion > 0.5) return {
+  if (mm > 0.5) return {
     label: 'Lluvia leve',
     desc: 'Precipitación leve detectada',
     imagen: '/imagenes/lluvioso.jpg',
   }
-  if (probabilidad > 60) return {
+  if (prob > 60) return {
     label: 'Parcialmente nublado',
     desc: 'Condiciones estables en la región',
     imagen: '/imagenes/nublado.jpg',
   }
-  if (probabilidad > 30) return {
+  if (prob > 30) return {
     label: 'Nublado',
     desc: 'Cielo cubierto sin lluvia',
     imagen: '/imagenes/nublado.jpg',
@@ -45,10 +49,11 @@ function calcularPuntoRocio(temp: number, humedad: number): number {
   return parseFloat(((b * alpha) / (a - alpha)).toFixed(1))
 }
 
-export default function CondicionWidget({ precipitacion, probabilidad, temp, humedad }: CondicionWidgetProps) {
-  const condicion = getCondicion(precipitacion, probabilidad)
+export default function CondicionWidget({ precipitacion, probabilidad, temp, humedad, uvIndex }: CondicionWidgetProps) {
+  const condicion  = getCondicion(precipitacion, probabilidad)
   const puntoRocio = calcularPuntoRocio(temp, humedad)
-  const indiceUV = precipitacion > 1 ? 2 : probabilidad > 60 ? 3 : 6
+
+  const indiceUV = uvIndex ?? 0
 
   return (
     <div style={{
@@ -58,7 +63,6 @@ export default function CondicionWidget({ precipitacion, probabilidad, temp, hum
       height: '100%',
       minHeight: '200px',
     }}>
-      {/* Imagen de fondo */}
       <Image
         src={condicion.imagen}
         alt={condicion.label}
@@ -67,14 +71,12 @@ export default function CondicionWidget({ precipitacion, probabilidad, temp, hum
         priority
       />
 
-      {/* Overlay degradado */}
       <div style={{
         position: 'absolute',
         top: 0, left: 0, right: 0, bottom: 0,
         background: 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.65))',
       }} />
 
-      {/* Contenido */}
       <div style={{
         position: 'relative',
         zIndex: 2,
@@ -110,7 +112,6 @@ export default function CondicionWidget({ precipitacion, probabilidad, temp, hum
           {condicion.desc}
         </div>
 
-        {/* Stats row */}
         <div style={{ display: 'flex', gap: '10px' }}>
           <div style={{
             background: 'rgba(255,255,255,0.15)',
