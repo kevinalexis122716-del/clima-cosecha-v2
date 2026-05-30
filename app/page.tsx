@@ -136,7 +136,7 @@ export default function Home() {
       background: '#f1f5f9',
       fontFamily: '"DM Sans", system-ui, sans-serif',
     }}>
-      <Sidebar alertasCount={alertasCount} onToggle={setSidebarCollapsed} />
+      <Sidebar alertasCount={alertasCount} onToggle={setSidebarCollapsed} ultimaActualizacion={clima?.timestamp} />
 
       <div style={{
         flex: 1,
@@ -289,7 +289,7 @@ export default function Home() {
               <Mapa lat={coords.lat} lng={coords.lng} onClickMapa={onClickMapa} />
             </div>
 
-            {/* COLUMNA DERECHA — solo CondicionWidget ocupando todo */}
+            {/* COLUMNA DERECHA */}
             <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{
                 flex: 1,
@@ -365,3 +365,4 @@ export default function Home() {
     </div>
   )
 }
+
