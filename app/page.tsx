@@ -89,6 +89,13 @@ export default function Home() {
     } catch { setLugar('Ubicación seleccionada') }
   }, [])
 
+  const onSelectHacienda = useCallback((h: { nombre: string; lat: number; lng: number }) => {
+    setCoords({ lat: h.lat, lng: h.lng })
+    setLugar(h.nombre)
+    localStorage.setItem('coords', JSON.stringify({ lat: h.lat, lng: h.lng }))
+    localStorage.setItem('lugar', h.nombre)
+  }, [])
+
   const horario: Record<string, number | string>[] = Array.isArray(pronostico?.horario) ? pronostico.horario : []
   
   const alertasCount = horario.filter((h) => Number(h.precipitacion) > 5).length
@@ -110,6 +117,7 @@ export default function Home() {
         ultimaActualizacion={clima?.timestamp}
         coords={coords}
         lugar={lugar}
+        onSelectHacienda={onSelectHacienda}
       />
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
