@@ -111,16 +111,16 @@ function generarResumenTecnico(dia: DiaData, horas: HoraData[], clase: { label: 
   } else {
     resumen += `La ausencia de precipitaciones significativas garantiza condiciones de piso óptimas para el tránsito ininterrumpido de maquinaria, el corte y el alce de la caña. `
   }
-
-  resumen += `\n\nTérmicamente, la amplitud será de ${(dia.tempMax - dia.tempMin).toFixed(1)}°C (mínima de ${dia.tempMin}°C, máxima de ${dia.tempMax}°C), condicionando una evapotranspiración estimada de ${tecnico?.evapotranspiracion ?? '--'} mm/día. `
-
+  
+  resumen += `\n\nTérmicamente, la amplitud será de ${(dia.tempMax - dia.tempMin).toFixed(1)}°C (mínima de ${dia.tempMin}°C, máxima de ${dia.tempMax}°C). `
+  
   let nivelHumedad = ''
   if (dia.humedad > 85 || (tecnico?.horasHR90 && tecnico.horasHR90 > 4)) nivelHumedad = 'niveles muy altos'
   else if (dia.humedad > 70) nivelHumedad = 'niveles altos'
   else if (dia.humedad > 50) nivelHumedad = 'niveles medios'
   else nivelHumedad = 'niveles bajos'
 
-  resumen += `La humedad relativa promediará un ${dia.humedad}%, manteniéndose en ${nivelHumedad}.`
+  resumen += `La humedad relativa promediará un ${dia.humedad}%.`
   return resumen
 }
 
