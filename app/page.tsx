@@ -53,14 +53,16 @@ export default function Home() {
   const [lugar, setLugar] = useState('Buga')
   const [, setSidebarCollapsed] = useState(false)
 
+  // CONFIGURADO: Sincronizado intervalo de actualización a 15 minutos (900000 ms)
   const { data: clima, isLoading: loadingClima } = useSWR(
     `/api/clima?lat=${coords.lat}&lng=${coords.lng}`,
-    fetcher, { refreshInterval: 1200000 }
+    fetcher, { refreshInterval: 900000 }
   )
 
+  // CONFIGURADO: Sincronizado intervalo de actualización a 15 minutos (900000 ms)
   const { data: pronostico, isLoading: loadingPron } = useSWR(
     `/api/pronostico?lat=${coords.lat}&lng=${coords.lng}`,
-    fetcher, { refreshInterval: 1200000 }
+    fetcher, { refreshInterval: 900000 }
   )
 
   const onClickMapa = useCallback(async (lat: number, lng: number) => {
@@ -77,7 +79,9 @@ export default function Home() {
   }, [])
 
   const horario: Record<string, number | string>[] = Array.isArray(pronostico?.horario) ? pronostico.horario : []
-  const alertasCount = horario.filter((h) => Number(h.precipitacion) > 0.5).length
+  
+  // CONFIGURADO: Lógica estricta de alertas filtrando solo precipitaciones mayores a 5 mm por hora
+  const alertasCount = horario.filter((h) => Number(h.precipitacion) > 5).length
 
   const kpis = [
     { label: 'TEMPERATURA', valor: loadingClima ? '--' : `${clima?.temp ?? '--'}°C`, sub: `Sensación ${clima?.sensacion ?? '--'}°C`, icono: '/iconos/temperatura.png', color: '#f97316' },
@@ -102,7 +106,7 @@ export default function Home() {
 
         <div className="flex md:hidden items-center justify-start bg-white px-4 py-3 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2">
-            <Image src="/iconos/probabilidad.png" alt="logo" width={28} height={28} style={{ objectFit: 'contain' }} />
+            <Image src="/iconos/probabilidad.png" alt="logo" width={28} height={28} style={{ objectFit: 'contain', flexShrink: 0 }} />
             <div>
               <div className="font-bold text-[0.95rem] text-slate-900 leading-tight">Clima Cosecha</div>
               <div className="text-[0.65rem] text-slate-400 leading-tight">Monitoreo agroclimático</div>
