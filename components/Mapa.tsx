@@ -59,7 +59,7 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
         map.addSource('radar', {
           type: 'raster',
           tiles: [
-            `https://tile.openweathermap.org/map/radar/{z}/{x}/{y}.png?appid=${owmKey}`
+            `https://maps.openweathermap.org/maps/2.0/radar/{z}/{x}/{y}?appid=${owmKey}`
           ],
           tileSize: 256,
           attribution: '© OpenWeatherMap',
