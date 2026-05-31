@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 const TOMORROW_KEY = process.env.TOMORROW_API_KEY
 
 const cache: Record<string, { data: unknown; ts: number }> = {}
-const CACHE_TTL = 3600000
+const CACHE_TTL = 900000 // CONFIGURADO: 15 minutos en milisegundos (15 * 60 * 1000)
 
 function getCache(key: string) {
   const entry = cache[key]
@@ -15,6 +15,7 @@ function setCache(key: string, data: unknown) {
   cache[key] = { data, ts: Date.now() }
 }
 
+// 1. Horario 24h para el Dashboard
 async function getHorarioOpenMeteo(lat: number, lng: number) {
   const cacheKey = `openmeteo-pronostico-${lat}-${lng}`
   const cached = getCache(cacheKey)
@@ -24,30 +25,36 @@ async function getHorarioOpenMeteo(lat: number, lng: number) {
     const res = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
       `&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,relative_humidity_2m` +
-      `&wind_speed_unit=kmh&timezone=America%2FBogota&forecast_days=2`,
-      { next: { revalidate: 1800 } }
+      `&wind_speed_unit=kmh&timezone=America%2FBogota&forecast_days=3`,
+      { next: { revalidate: 900 } } // CONFIGURADO: Revalidar cada 15 minutos (900 segundos)
     )
     if (!res.ok) return null
     const data = await res.json()
 
-    const ahoraStr = new Date().toLocaleString('sv-SE', { timeZone: 'America/Bogota' })
-    const ahoraISO = ahoraStr.slice(0, 10) + 'T' + ahoraStr.slice(11, 13)
-    const idxActual = data.hourly.time.findIndex((t: string) => t.slice(0, 13) === ahoraISO)
-    const inicio = idxActual >= 0 ? idxActual : 0
+    const now = Date.now()
+    let startIndex = data.hourly.time.findIndex((t: string) => {
+      const timeMs = new Date(t + "-05:00").getTime()
+      return timeMs >= now - 3600000
+    })
+    if (startIndex === -1) startIndex = 0
 
-    const resultado = data.hourly.time.slice(inicio, inicio + 24).map((t: string, i: number) => ({
-      hora: t,
-      temp: Math.round(data.hourly.temperature_2m[inicio + i] * 10) / 10,
-      precipitacion: parseFloat((data.hourly.precipitation[inicio + i] ?? 0).toFixed(2)),
-      probabilidad: data.hourly.precipitation_probability[inicio + i] ?? 0,
-      humedad: Math.round(data.hourly.relative_humidity_2m[inicio + i]),
-      viento: Math.round(data.hourly.wind_speed_10m[inicio + i] * 10) / 10,
-    }))
+    const resultado = data.hourly.time.slice(startIndex, startIndex + 24).map((t: string, i: number) => {
+      const idx = startIndex + i
+      return {
+        hora: t,
+        temp: Math.round(data.hourly.temperature_2m[idx] * 10) / 10,
+        precipitacion: parseFloat((data.hourly.precipitation[idx] ?? 0).toFixed(2)),
+        probabilidad: data.hourly.precipitation_probability[idx] ?? 0,
+        humedad: Math.round(data.hourly.relative_humidity_2m[idx]),
+        viento: Math.round(data.hourly.wind_speed_10m[idx] * 10) / 10,
+      }
+    })
     setCache(cacheKey, resultado)
     return resultado
   } catch { return null }
 }
 
+// 2. Horario Tomorrow para fusionar datos secundarios
 async function getHorarioTomorrow(lat: number, lng: number) {
   const cacheKey = `tomorrow-pronostico-${lat}-${lng}`
   const cached = getCache(cacheKey)
@@ -56,11 +63,11 @@ async function getHorarioTomorrow(lat: number, lng: number) {
   try {
     const res = await fetch(
       `https://api.tomorrow.io/v4/weather/forecast?location=${lat},${lng}&apikey=${TOMORROW_KEY}&units=metric&timesteps=1h`,
-      { next: { revalidate: 3600 } }
+      { next: { revalidate: 900 } } // CONFIGURADO: Revalidar cada 15 minutos (900 segundos)
     )
     if (!res.ok) return null
     const data = await res.json()
-    const resultado = data.timelines.hourly.slice(0, 24).map((h: { time: string; values: Record<string, number> }) => ({
+    const resultado = data.timelines.hourly.slice(0, 48).map((h: { time: string; values: Record<string, number> }) => ({
       hora: h.time,
       temp: Math.round(h.values.temperature * 10) / 10,
       humedad: Math.round(h.values.humidity),
@@ -71,7 +78,7 @@ async function getHorarioTomorrow(lat: number, lng: number) {
   } catch { return null }
 }
 
-// Datos horarios por día para los próximos 5 días (para gráficas y eventos)
+// 3. Horario 5 DÍAS COMPLETOS (Para gráficas de toda la semana)
 async function getHorarioPorDia(lat: number, lng: number) {
   const cacheKey = `openmeteo-horario-dias-${lat}-${lng}`
   const cached = getCache(cacheKey)
@@ -82,16 +89,12 @@ async function getHorarioPorDia(lat: number, lng: number) {
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
       `&hourly=temperature_2m,precipitation,precipitation_probability,relative_humidity_2m,wind_speed_10m` +
       `&wind_speed_unit=kmh&timezone=America%2FBogota&forecast_days=5`,
-      { next: { revalidate: 3600 } }
+      { next: { revalidate: 900 } } // CONFIGURADO: Revalidar cada 15 minutos (900 segundos)
     )
     if (!res.ok) return null
     const data = await res.json()
 
-    // Agrupar por fecha
-    const porFecha: Record<string, {
-      hora: string, temp: number, precipitacion: number,
-      probabilidad: number, humedad: number, viento: number
-    }[]> = {}
+    const porFecha: Record<string, any[]> = {}
 
     data.hourly.time.forEach((t: string, i: number) => {
       const fecha = t.slice(0, 10)
@@ -111,6 +114,7 @@ async function getHorarioPorDia(lat: number, lng: number) {
   } catch { return null }
 }
 
+// 4. Resumen Diario 5 días
 async function getDiarioOpenMeteo(lat: number, lng: number) {
   const cacheKey = `openmeteo-diario-${lat}-${lng}`
   const cached = getCache(cacheKey)
@@ -121,7 +125,7 @@ async function getDiarioOpenMeteo(lat: number, lng: number) {
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
       `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,relative_humidity_2m_max` +
       `&wind_speed_unit=kmh&timezone=America%2FBogota&forecast_days=5`,
-      { next: { revalidate: 3600 } }
+      { next: { revalidate: 900 } } // CONFIGURADO: Revalidar cada 15 minutos (900 segundos)
     )
     if (!res.ok) return null
     const data = await res.json()
@@ -155,8 +159,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Pronóstico no disponible' }, { status: 500 })
   }
 
-  const horarioFinal = openmeteo.map((om: Record<string, number | string>, i: number) => {
-    const tw = tomorrow?.[i]
+  const horarioFinal = openmeteo.map((om: Record<string, number | string>) => {
+    const omTime = new Date(om.hora + "-05:00").getTime();
+    const tw = tomorrow?.find((t: Record<string, number | string>) => new Date(t.hora as string).getTime() === omTime);
+
     return {
       hora: om.hora,
       precipitacion: om.precipitacion,
@@ -171,10 +177,7 @@ export async function GET(request: Request) {
     horario: horarioFinal,
     diario: diario || [],
     horarioPorDia: horarioPorDia || {},
-    fuentes: {
-      openmeteo: 'ok',
-      tomorrow: tomorrow ? 'ok' : 'error',
-    },
+    fuentes: { openmeteo: 'ok', tomorrow: tomorrow ? 'ok' : 'error' },
     timestamp: new Date().toISOString(),
   })
 }
