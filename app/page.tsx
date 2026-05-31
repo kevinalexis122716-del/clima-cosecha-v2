@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import useSWR from 'swr'
 import Image from 'next/image'
@@ -49,20 +49,16 @@ function getIconoCondicion(mm: number, prob: number) {
 }
 
 export default function Home() {
-  const [coords, setCoords] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('coords')
-      return saved ? JSON.parse(saved) : { lat: 3.9044, lng: -76.2960 }
-    }
-    return { lat: 3.9044, lng: -76.2960 }
-  })
-  const [lugar, setLugar] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('lugar') || 'Buga'
-    }
-    return 'Buga'
-  })
+  const [coords, setCoords] = useState({ lat: 3.9044, lng: -76.2960 })
+  const [lugar, setLugar] = useState('Buga')
   const [, setSidebarCollapsed] = useState(false)
+
+  useEffect(() => {
+    const savedCoords = localStorage.getItem('coords')
+    const savedLugar = localStorage.getItem('lugar')
+    if (savedCoords) setCoords(JSON.parse(savedCoords))
+    if (savedLugar) setLugar(savedLugar)
+  }, [])
 
   const { data: clima, isLoading: loadingClima } = useSWR(
     `/api/clima?lat=${coords.lat}&lng=${coords.lng}`,
