@@ -2,24 +2,11 @@ import { NextResponse } from 'next/server'
 
 const TOMORROW_KEY = process.env.TOMORROW_API_KEY
 
-const cache: Record<string, { data: unknown; ts: number }> = {}
-const CACHE_TTL = 900000 // 15 minutos en milisegundos (15 * 60 * 1000)
-
-function getCache(key: string) {
-  const entry = cache[key]
-  if (!entry) return null
-  if (Date.now() - entry.ts > CACHE_TTL) return null
-  return entry.data
-}
-function setCache(key: string, data: unknown) {
-  cache[key] = { data, ts: Date.now() }
-}
+// NOTA: El caché lo maneja Next.js automáticamente con { next: { revalidate: 900 } }
+// en cada fetch. En Vercel serverless el caché en memoria no persiste entre peticiones.
 
 // 1. Horario 24h para el Dashboard Principal
 async function getHorarioOpenMeteo(lat: number, lng: number) {
-  const cacheKey = `openmeteo-pronostico-v3-${lat}-${lng}` // Actualizado a v3 para forzar limpieza completa
-  const cached = getCache(cacheKey)
-  if (cached) return cached as Record<string, number | string>[]
 
   try {
     const res = await fetch(
@@ -49,16 +36,12 @@ async function getHorarioOpenMeteo(lat: number, lng: number) {
         viento: Math.round(data.hourly.wind_speed_10m[idx] * 10) / 10,
       }
     })
-    setCache(cacheKey, resultado)
     return resultado
   } catch { return null }
 }
 
 // 2. Horario Tomorrow para fusionar datos secundarios
 async function getHorarioTomorrow(lat: number, lng: number) {
-  const cacheKey = `tomorrow-pronostico-v3-${lat}-${lng}` // Actualizado a v3
-  const cached = getCache(cacheKey)
-  if (cached) return cached as Record<string, number | string>[]
 
   try {
     const res = await fetch(
@@ -73,21 +56,17 @@ async function getHorarioTomorrow(lat: number, lng: number) {
       humedad: Math.round(h.values.humidity),
       viento: Math.round(h.values.windSpeed * 10) / 10,
     }))
-    setCache(cacheKey, resultado)
     return resultado
   } catch { return null }
 }
 
 // 3. Horario 5 DÍAS COMPLETOS (Para gráficas de toda la semana)
 async function getHorarioPorDia(lat: number, lng: number) {
-  const cacheKey = `openmeteo-horario-dias-v3-${lat}-${lng}` // Actualizado a v3 para liberar flujo semanal completo
-  const cached = getCache(cacheKey)
-  if (cached) return cached
 
   try {
     const res = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
-      `&hourly=temperature_2m,precipitation,precipitation_probability,relative_humidity_2m,wind_speed_10m` +
+      `&hourly=temperature_2m,precipitation,precipitation_probability,relative_humidity_2m,wind_speed_10m,surface_pressure` +
       `&wind_speed_unit=kmh&timezone=America%2FBogota&forecast_days=5`,
       { next: { revalidate: 900 } } // Revalidar estrictamente cada 15 minutos
     )
@@ -106,19 +85,16 @@ async function getHorarioPorDia(lat: number, lng: number) {
         probabilidad: data.hourly.precipitation_probability[i] ?? 0,
         humedad: Math.round(data.hourly.relative_humidity_2m[i]),
         viento: Math.round(data.hourly.wind_speed_10m[i] * 10) / 10,
+        presion: Math.round(data.hourly.surface_pressure[i] ?? 0),
       })
     })
 
-    setCache(cacheKey, porFecha)
     return porFecha
   } catch { return null }
 }
 
 // 4. Resumen Diario 5 días
 async function getDiarioOpenMeteo(lat: number, lng: number) {
-  const cacheKey = `openmeteo-diario-v3-${lat}-${lng}` // Actualizado a v3
-  const cached = getCache(cacheKey)
-  if (cached) return cached as Record<string, number | string>[]
 
   try {
     const res = await fetch(
@@ -138,7 +114,6 @@ async function getDiarioOpenMeteo(lat: number, lng: number) {
       viento: Math.round(data.daily.wind_speed_10m_max[i] * 10) / 10,
       humedad: Math.round(data.daily.relative_humidity_2m_max[i]),
     }))
-    setCache(cacheKey, resultado)
     return resultado
   } catch { return null }
 }
