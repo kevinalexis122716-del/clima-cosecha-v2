@@ -90,7 +90,6 @@ function getDescripcionDia(mm: number, prob: number, tempMax: number, tempMin: n
     desc += `. Temperaturas entre ${tempMin}°C y ${tempMax}°C`
   }
 
-  // ESCALA NEUTRAL DE HUMEDAD
   if (humedad > 85) {
     desc += `. Humedad muy alta`
   } else if (humedad > 70) {
@@ -111,7 +110,6 @@ function generarResumenTecnico(dia: DiaData, horas: HoraData[], clase: {label: s
   
   let resumen = `Para la jornada se prevé un escenario meteorológico catalogado como ${clase.label.toLowerCase()}. `;
   
-  // 1. Impacto de precipitaciones y operaciones
   if (dia.precipitacion > 0) {
     resumen += `Se estima un acumulado total de ${dia.precipitacion.toFixed(1)} mm`;
     if (max1h > 0) resumen += `, con una intensidad máxima proyectada de ${max1h.toFixed(1)} mm/h. `;
@@ -128,10 +126,8 @@ function generarResumenTecnico(dia: DiaData, horas: HoraData[], clase: {label: s
     resumen += `La ausencia de precipitaciones significativas garantiza condiciones de piso óptimas para el tránsito ininterrumpido de maquinaria, el corte y el alce de la caña. `;
   }
 
-  // 2. Temperaturas y estrés
   resumen += `\n\nTérmicamente, la amplitud será de ${(dia.tempMax - dia.tempMin).toFixed(1)}°C (mínima de ${dia.tempMin}°C, máxima de ${dia.tempMax}°C), condicionando una evapotranspiración estimada de ${tecnico?.evapotranspiracion ?? '--'} mm/día. `;
 
-  // 3. Humedad en escala neutral
   let nivelHumedad = '';
   if (dia.humedad > 85 || (tecnico?.horasHR90 && tecnico.horasHR90 > 4)) {
     nivelHumedad = 'niveles muy altos';
@@ -168,6 +164,7 @@ function calcularEventos(horas: HoraData[]) {
   return { tempMax, tempMin, horaMax, horaMin, inicioLluvia, finLluvia, picoPrecip }
 }
 
+// ── Gráfica SVG simple ──────────────────────────────────────────────────────
 function calcularDetallesTecnicos(horas: HoraData[], tempMax: number, tempMin: number) {
   if (!horas || horas.length === 0) return null
 
@@ -182,7 +179,6 @@ function calcularDetallesTecnicos(horas: HoraData[], tempMax: number, tempMin: n
   return { amplitud, humedadMedia, horasHR90, evapotranspiracion, radiacion, rocioPromedio, presion }
 }
 
-// ── Gráfica SVG simple ──────────────────────────────────────────────────────
 function Grafica({ horas, tipo }: { horas: HoraData[]; tipo: 'temp' | 'precipitacion' | 'humedad' | 'viento' }) {
   if (!horas || horas.length === 0) return null
 
@@ -247,32 +243,40 @@ function Grafica({ horas, tipo }: { horas: HoraData[]; tipo: 'temp' | 'precipita
 
 // ── Componente principal ────────────────────────────────────────────────────
 export default function Pronosticos() {
-  const [coords] = useState({ lat: 3.9044, lng: -76.2960 })
-  const [lugar] = useState('Buga')
+  const [coords, setCoords] = useState({ lat: 3.9044, lng: -76.2960 })
+  const [lugar, setLugar] = useState('Buga')
   const [diaSeleccionado, setDiaSeleccionado] = useState(0)
   const [tabGrafica, setTabGrafica] = useState<'temp' | 'precipitacion' | 'humedad' | 'viento'>('temp')
   const [, setSidebarCollapsed] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
 
+  // NUEVO: Sincronización inteligente de locación desde la URL sin romper Suspense
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
     check()
     window.addEventListener('resize', check)
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const lat = parseFloat(params.get('lat') || '3.9044')
+      const lng = parseFloat(params.get('lng') || '-76.2960')
+      const name = params.get('lugar') || 'Buga'
+      setCoords({ lat, lng })
+      setLugar(name)
+    }
+
     return () => window.removeEventListener('resize', check)
   }, [])
 
   const { data: pronostico } = useSWR(
     `/api/pronostico?lat=${coords.lat}&lng=${coords.lng}`,
-    fetcher, { refreshInterval: 1200000 }
+    fetcher, { refreshInterval: 900000 } // Sincronizado a 15 min
   )
 
   const horarioPlano: HoraData[] = Array.isArray(pronostico?.horario) ? pronostico.horario : []
-  const horarioPorDia: Record<string, HoraData[]> = {}
-  horarioPlano.forEach(h => {
-    const fecha = h.hora.split('T')[0]
-    if (!horarioPorDia[fecha]) horarioPorDia[fecha] = []
-    horarioPorDia[fecha].push(h)
-  })
+  
+  // SOLUCIÓN: Leemos directamente el paquete estructurado de 120 horas del backend v2
+  const horarioPorDia: Record<string, HoraData[]> = pronostico?.horarioPorDia || {}
 
   const diario: DiaData[] = Array.isArray(pronostico?.diario) ? pronostico.diario.slice(0, 5) : []
   const diaActual = diario[diaSeleccionado]
@@ -540,7 +544,7 @@ export default function Pronosticos() {
                       )}
                     </div>
                   ) : (
-                    <div style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Eventos disponibles solo para los próximos 2 días.</div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Sin datos detallados por hora para este día.</div>
                   )}
                 </div>
 
