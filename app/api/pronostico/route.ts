@@ -17,7 +17,7 @@ function setCache(key: string, data: unknown) {
 
 // 1. Horario 24h para el Dashboard Principal
 async function getHorarioOpenMeteo(lat: number, lng: number) {
-  const cacheKey = `openmeteo-pronostico-v2-${lat}-${lng}` // Forzado v2 para limpiar memoria vieja
+  const cacheKey = `openmeteo-pronostico-v3-${lat}-${lng}` // Actualizado a v3 para forzar limpieza completa
   const cached = getCache(cacheKey)
   if (cached) return cached as Record<string, number | string>[]
 
@@ -26,7 +26,7 @@ async function getHorarioOpenMeteo(lat: number, lng: number) {
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
       `&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,relative_humidity_2m` +
       `&wind_speed_unit=kmh&timezone=America%2FBogota&forecast_days=3`,
-      { next: { revalidate: 900 } } // Revalidar cada 15 minutos
+      { next: { revalidate: 900 } } // Revalidar estrictamente cada 15 minutos
     )
     if (!res.ok) return null
     const data = await res.json()
@@ -56,14 +56,14 @@ async function getHorarioOpenMeteo(lat: number, lng: number) {
 
 // 2. Horario Tomorrow para fusionar datos secundarios
 async function getHorarioTomorrow(lat: number, lng: number) {
-  const cacheKey = `tomorrow-pronostico-v2-${lat}-${lng}` // Forzado v2
+  const cacheKey = `tomorrow-pronostico-v3-${lat}-${lng}` // Actualizado a v3
   const cached = getCache(cacheKey)
   if (cached) return cached as Record<string, number | string>[]
 
   try {
     const res = await fetch(
       `https://api.tomorrow.io/v4/weather/forecast?location=${lat},${lng}&apikey=${TOMORROW_KEY}&units=metric&timesteps=1h`,
-      { next: { revalidate: 900 } } // Revalidar cada 15 minutos
+      { next: { revalidate: 900 } } // Revalidar estrictamente cada 15 minutos
     )
     if (!res.ok) return null
     const data = await res.json()
@@ -80,7 +80,7 @@ async function getHorarioTomorrow(lat: number, lng: number) {
 
 // 3. Horario 5 DÍAS COMPLETOS (Para gráficas de toda la semana)
 async function getHorarioPorDia(lat: number, lng: number) {
-  const cacheKey = `openmeteo-horario-dias-v2-${lat}-${lng}` // ¡ACTUALIZADO v2! Fuerza descarga limpia de 5 días
+  const cacheKey = `openmeteo-horario-dias-v3-${lat}-${lng}` // Actualizado a v3 para liberar flujo semanal completo
   const cached = getCache(cacheKey)
   if (cached) return cached
 
@@ -89,7 +89,7 @@ async function getHorarioPorDia(lat: number, lng: number) {
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
       `&hourly=temperature_2m,precipitation,precipitation_probability,relative_humidity_2m,wind_speed_10m` +
       `&wind_speed_unit=kmh&timezone=America%2FBogota&forecast_days=5`,
-      { next: { revalidate: 900 } } // Revalidar cada 15 minutos
+      { next: { revalidate: 900 } } // Revalidar estrictamente cada 15 minutos
     )
     if (!res.ok) return null
     const data = await res.json()
@@ -97,7 +97,7 @@ async function getHorarioPorDia(lat: number, lng: number) {
     const porFecha: Record<string, any[]> = {}
 
     data.hourly.time.forEach((t: string, i: number) => {
-      const fecha = t.slice(0, 10)
+      const fecha = t.slice(0, 10) // Extrae 'YYYY-MM-DD' de manera exacta
       if (!porFecha[fecha]) porFecha[fecha] = []
       porFecha[fecha].push({
         hora: t,
@@ -116,7 +116,7 @@ async function getHorarioPorDia(lat: number, lng: number) {
 
 // 4. Resumen Diario 5 días
 async function getDiarioOpenMeteo(lat: number, lng: number) {
-  const cacheKey = `openmeteo-diario-v2-${lat}-${lng}` // Forzado v2
+  const cacheKey = `openmeteo-diario-v3-${lat}-${lng}` // Actualizado a v3
   const cached = getCache(cacheKey)
   if (cached) return cached as Record<string, number | string>[]
 
@@ -125,7 +125,7 @@ async function getDiarioOpenMeteo(lat: number, lng: number) {
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
       `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,relative_humidity_2m_max` +
       `&wind_speed_unit=kmh&timezone=America%2FBogota&forecast_days=5`,
-      { next: { revalidate: 900 } } // Revalidar cada 15 minutos
+      { next: { revalidate: 900 } } // Revalidar estrictamente cada 15 minutos
     )
     if (!res.ok) return null
     const data = await res.json()
