@@ -49,8 +49,19 @@ function getIconoCondicion(mm: number, prob: number) {
 }
 
 export default function Home() {
-  const [coords, setCoords] = useState({ lat: 3.9044, lng: -76.2960 })
-  const [lugar, setLugar] = useState('Buga')
+  const [coords, setCoords] = useState(() => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('coords')
+    return saved ? JSON.parse(saved) : { lat: 3.9044, lng: -76.2960 }
+  }
+  return { lat: 3.9044, lng: -76.2960 }
+})
+const [lugar, setLugar] = useState(() => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('lugar') || 'Buga'
+  }
+  return 'Buga'
+})
   const [, setSidebarCollapsed] = useState(false)
 
   // CONFIGURADO: Sincronizado intervalo de actualización a 15 minutos (900000 ms)
