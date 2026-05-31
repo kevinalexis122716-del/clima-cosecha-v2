@@ -90,11 +90,16 @@ export default function Home() {
 
   return (
     <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-slate-50 font-sans">
-      <Sidebar alertasCount={alertasCount} onToggle={setSidebarCollapsed} ultimaActualizacion={clima?.timestamp} />
+      <Sidebar
+        alertasCount={alertasCount}
+        onToggle={setSidebarCollapsed}
+        ultimaActualizacion={clima?.timestamp}
+        coords={coords}
+        lugar={lugar}
+      />
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        
-        {/* TOPBAR MÓVIL (Alineado a la izquierda, justo donde empezaban las rayas) */}
+
         <div className="flex md:hidden items-center justify-start bg-white px-4 py-3 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2">
             <Image src="/iconos/probabilidad.png" alt="logo" width={28} height={28} style={{ objectFit: 'contain' }} />
@@ -105,31 +110,28 @@ export default function Home() {
           </div>
         </div>
 
-        {/* TOPBAR ESCRITORIO / INFO LOCACIÓN MÓVIL */}
         <div className="bg-white border-b border-slate-200 px-4 md:px-5 py-2 md:py-[10px] flex items-center justify-between shrink-0 md:h-[52px]">
           <div className="flex items-center gap-2">
             <MapPin size={15} color="#2563eb" />
-            <span className="font-semibold text-blue-600 text-[0.88rem] md:text-[0.88rem]">{lugar}</span>
+            <span className="font-semibold text-blue-600 text-[0.88rem]">{lugar}</span>
             <span className="text-slate-400 text-[0.75rem] hidden md:block">
               {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
             </span>
           </div>
           <div className="flex flex-col md:flex-row items-end md:items-center gap-1 md:gap-[20px]">
             <div className="flex items-center gap-[6px] text-slate-500 text-[0.75rem] md:text-[0.82rem]">
-              <Calendar size={13} className="md:w-[14px] md:h-[14px]" />
+              <Calendar size={13} />
               <span className="capitalize">{getFechaActual()}</span>
             </div>
             <div className="flex items-center gap-[6px] text-slate-900 text-[0.8rem] md:text-[0.88rem] font-bold">
-              <Clock size={13} color="#2563eb" className="md:w-[14px] md:h-[14px]" />
+              <Clock size={13} color="#2563eb" />
               <span>{getHoraActual()}</span>
             </div>
           </div>
         </div>
 
-        {/* CONTENIDO (Con scroll en móvil y padding abajo para la barra) */}
         <div className="flex-1 p-3 md:p-4 flex flex-col gap-[10px] overflow-y-auto md:overflow-hidden pb-[90px] md:pb-4">
 
-          {/* KPI STRIP (2 columnas en celular, 6 en PC) */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-[10px] shrink-0">
             {kpis.map((kpi, i) => (
               <div key={i} className="bg-white rounded-xl p-[10px] md:p-[10px_14px] border border-slate-200 flex items-center gap-2 md:gap-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
@@ -143,10 +145,7 @@ export default function Home() {
             ))}
           </div>
 
-          {/* MAPA + COLUMNA DERECHA (Apilados en celular, lado a lado en PC) */}
           <div className="flex flex-col md:grid md:grid-cols-[1fr_300px] gap-[10px] flex-none md:flex-1 min-h-0 shrink-0 md:shrink">
-
-            {/* MAPA */}
             <div className="relative bg-white rounded-xl border border-slate-200 overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)] h-[250px] md:h-auto md:min-h-0">
               <div className="absolute top-[10px] left-[10px] z-10 bg-white/90 backdrop-blur-md rounded-lg py-[5px] px-[12px] border border-slate-200 text-[0.72rem] text-slate-600 flex items-center gap-[8px] shadow-sm">
                 <span className="w-[7px] h-[7px] bg-emerald-500 rounded-full shadow-[0_0_5px_#10b981]" />
@@ -167,7 +166,6 @@ export default function Home() {
               <Mapa lat={coords.lat} lng={coords.lng} onClickMapa={onClickMapa} />
             </div>
 
-            {/* COLUMNA DERECHA */}
             <div className="flex flex-col min-h-0 shrink-0 md:shrink">
               <div className="flex-1 rounded-xl overflow-hidden min-h-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                 <CondicionWidget precipitacion={clima?.precipitacion ?? 0} probabilidad={clima?.probabilidad ?? 0} temp={clima?.temp ?? 25} humedad={clima?.humedad ?? 60} uvIndex={clima?.uvIndex ?? null} />
@@ -175,11 +173,8 @@ export default function Home() {
             </div>
           </div>
 
-          {/* PRÓXIMAS 24 HORAS */}
           <div className="bg-white rounded-xl py-[12px] px-[16px] border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)] shrink-0">
-            <div className="text-[0.62rem] font-bold text-slate-400 tracking-[1px] mb-[10px]">
-              PRÓXIMAS 24 HORAS
-            </div>
+            <div className="text-[0.62rem] font-bold text-slate-400 tracking-[1px] mb-[10px]">PRÓXIMAS 24 HORAS</div>
             {loadingPron ? (
               <div className="text-slate-400 text-[0.82rem]">Cargando pronóstico...</div>
             ) : (
