@@ -21,6 +21,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Clima Cosecha" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className={`${dmSans.className} bg-slate-50 min-h-screen m-0 p-0`}>
         {children}
