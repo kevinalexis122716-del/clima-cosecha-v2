@@ -10,9 +10,11 @@ interface SidebarProps {
   alertasCount?: number
   onToggle?: (collapsed: boolean) => void
   ultimaActualizacion?: string
+  coords?: { lat: number; lng: number }
+  lugar?: string
 }
 
-export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacion }: SidebarProps) {
+export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacion, coords, lugar }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const [minutos, setMinutos] = useState(0)
@@ -34,26 +36,28 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
     onToggle?.(next)
   }
 
+  const pronosticosHref = coords
+    ? `/pronosticos?lat=${coords.lat}&lng=${coords.lng}&lugar=${encodeURIComponent(lugar || 'Buga')}`
+    : '/pronosticos'
+
   const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { href: null, label: 'Pronósticos', icon: CloudRain },
+    { href: pronosticosHref, label: 'Pronósticos', icon: CloudRain, disabled: false },
     { href: null, label: 'Alertas', icon: Bell, badge: alertasCount },
   ]
 
-  // Items para la barra móvil (incluye el perfil de tu diseño)
   const navItemsMobile = [
-    ...navItems,
-    { href: null, label: 'Perfil', icon: User }
+    { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { href: pronosticosHref, label: 'Pronósticos', icon: CloudRain },
+    { href: null, label: 'Alertas', icon: Bell, badge: alertasCount },
+    { href: null, label: 'Perfil', icon: User },
   ]
 
   return (
     <>
-      {/* SIDEBAR ESCRITORIO (Se oculta en celular) */}
-      <aside className="hidden md:flex flex-col shrink-0 overflow-hidden relative transition-all duration-300 bg-white border-r border-slate-200" 
-        style={{
-          width: collapsed ? '68px' : '220px',
-          minHeight: '100vh',
-        }}>
+      {/* SIDEBAR ESCRITORIO */}
+      <aside className="hidden md:flex flex-col shrink-0 overflow-hidden relative transition-all duration-300 bg-white border-r border-slate-200"
+        style={{ width: collapsed ? '68px' : '220px', minHeight: '100vh' }}>
 
         {/* LOGO + TOGGLE */}
         <div className="p-4 flex items-center justify-between border-b border-slate-200 gap-2">
@@ -68,7 +72,6 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
               </div>
             )}
           </div>
-
           <button onClick={toggle} className="w-[26px] h-[26px] shrink-0 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center cursor-pointer text-slate-500 transition-colors hover:bg-slate-200">
             {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
@@ -76,42 +79,36 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
 
         {/* NAV ESCRITORIO */}
         <nav className="flex-1 p-3">
-          {navItems.map(({ href, label, icon: Icon, badge }) => {
-            const active = href !== null && pathname === href
-            const disabled = href === null
+          {navItems.map(({ href, label, icon: Icon, badge, disabled }) => {
+            const active = href !== null && (pathname === href || (label === 'Pronósticos' && pathname === '/pronosticos'))
+            const isDisabled = disabled === true || href === null
 
             const content = (
               <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
+                display: 'flex', alignItems: 'center', gap: '10px',
                 padding: collapsed ? '10px 0' : '10px 12px',
                 justifyContent: collapsed ? 'center' : 'flex-start',
-                margin: '2px 0',
-                borderRadius: '10px',
+                margin: '2px 0', borderRadius: '10px',
                 background: active ? '#eff6ff' : 'transparent',
-                color: disabled ? '#cbd5e1' : active ? '#2563eb' : '#64748b',
-                cursor: disabled ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s',
-                position: 'relative',
-                opacity: disabled ? 0.5 : 1,
+                color: isDisabled ? '#cbd5e1' : active ? '#2563eb' : '#64748b',
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s', position: 'relative',
+                opacity: isDisabled ? 0.5 : 1,
               }}>
                 <Icon size={18} strokeWidth={active ? 2.5 : 1.8} />
                 {!collapsed && (
                   <span style={{ fontSize: '0.85rem', fontWeight: active ? 600 : 400, whiteSpace: 'nowrap', flex: 1 }}>{label}</span>
                 )}
-                {!collapsed && disabled && (
+                {!collapsed && isDisabled && href === null && (
                   <span className="text-[0.58rem] font-bold bg-slate-100 text-slate-400 px-[6px] py-[2px] rounded-full border border-slate-200">Pronto</span>
                 )}
                 {badge !== undefined && badge > 0 && (
                   <span style={{
                     position: collapsed ? 'absolute' : 'relative',
-                    top: collapsed ? '4px' : 'auto',
-                    right: collapsed ? '4px' : 'auto',
+                    top: collapsed ? '4px' : 'auto', right: collapsed ? '4px' : 'auto',
                     background: '#ef4444', color: 'white',
                     fontSize: '0.6rem', fontWeight: 700,
-                    padding: '1px 5px', borderRadius: '20px',
-                    minWidth: '16px', textAlign: 'center',
+                    padding: '1px 5px', borderRadius: '20px', minWidth: '16px', textAlign: 'center',
                   }}>{badge}</span>
                 )}
               </div>
@@ -142,27 +139,37 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
         </div>
       </aside>
 
-      {/* BOTTOM NAVIGATION CELULAR (Se oculta en PC) */}
+      {/* BOTTOM NAVIGATION MÓVIL */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 flex items-center justify-around pb-6 pt-3 px-2 z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] rounded-t-3xl">
         {navItemsMobile.map(({ href, label, icon: Icon, badge }) => {
-          const active = href !== null && pathname === href;
-          const disabled = href === null;
-          
+          const active = href !== null && (pathname === href || (label === 'Pronósticos' && pathname === '/pronosticos'))
+          const disabled = href === null
+
           return (
             <div key={label} className="relative flex flex-col items-center gap-1">
               {active && <div className="absolute -top-3 w-8 h-1 rounded-full bg-blue-600" />}
               <div className={`flex flex-col items-center gap-1 ${disabled ? 'opacity-40' : ''}`}>
-                <div className="relative">
-                  <Icon size={22} color={active ? '#2563eb' : '#94a3b8'} strokeWidth={active ? 2.5 : 2} />
-                  {badge !== undefined && badge > 0 && (
-                    <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[0.6rem] font-bold px-[5px] py-[1px] rounded-full border-2 border-white">
-                      {badge}
-                    </span>
-                  )}
-                </div>
-                <span style={{ fontSize: '0.65rem', color: active ? '#2563eb' : '#94a3b8', fontWeight: active ? 700 : 500 }}>
-                  {label}
-                </span>
+                {href ? (
+                  <Link href={href} style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <div className="relative">
+                      <Icon size={22} color={active ? '#2563eb' : '#94a3b8'} strokeWidth={active ? 2.5 : 2} />
+                      {badge !== undefined && badge > 0 && (
+                        <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[0.6rem] font-bold px-[5px] py-[1px] rounded-full border-2 border-white">{badge}</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.65rem', color: active ? '#2563eb' : '#94a3b8', fontWeight: active ? 700 : 500 }}>{label}</span>
+                  </Link>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <Icon size={22} color="#94a3b8" strokeWidth={2} />
+                      {badge !== undefined && badge > 0 && (
+                        <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[0.6rem] font-bold px-[5px] py-[1px] rounded-full border-2 border-white">{badge}</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 500 }}>{label}</span>
+                  </>
+                )}
               </div>
             </div>
           )
