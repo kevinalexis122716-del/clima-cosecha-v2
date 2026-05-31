@@ -556,10 +556,6 @@ export default function Pronosticos() {
                 <div className="font-extrabold text-slate-900 mt-0.5">{tecnico?.horasHR90 ?? '--'} horas</div>
               </div>
               <div>
-                <div className="text-slate-400 font-medium">Evapotranspiración estimada</div>
-                <div className="font-extrabold text-slate-900 mt-0.5">{tecnico?.evapotranspiracion ?? '--'} mm/día</div>
-              </div>
-              <div>
                 <div className="text-slate-400 font-medium">Radiación solar máxima</div>
                 <div className="font-extrabold text-slate-900 mt-0.5">{tecnico?.radiacion ?? '--'} W/m²</div>
               </div>
@@ -712,7 +708,6 @@ export default function Pronosticos() {
                       <div><div className="text-slate-400 font-medium">Amp. térmica</div><div className="font-bold mt-0.5">{tecnico.amplitud} °C</div></div>
                       <div><div className="text-slate-400 font-medium">HR Media</div><div className="font-bold mt-0.5">{tecnico.humedadMedia} %</div></div>
                       <div><div className="text-slate-400 font-medium">HR &gt; 90%</div><div className="font-bold mt-0.5">{tecnico.horasHR90} h</div></div>
-                      <div><div className="text-slate-400 font-medium">Evapotransp.</div><div className="font-bold mt-0.5">{tecnico.evapotranspiracion} mm</div></div>
                       <div><div className="text-slate-400 font-medium">Radiación Máx</div><div className="font-bold mt-0.5">{tecnico.radiacion} W/m²</div></div>
                       <div><div className="text-slate-400 font-medium">Punto Rocío</div><div className="font-bold mt-0.5">{tecnico.rocioPromedio} °C</div></div>
                       <div className="col-span-3 text-center border-t border-slate-100 pt-2"><div className="text-slate-400 font-medium">Presión atmosférica</div><div className="font-bold mt-0.5">{tecnico.presion ?? '--'} hPa</div></div>
