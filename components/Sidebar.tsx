@@ -36,21 +36,26 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
     onToggle?.(next)
   }
 
-  // SOLUCIÓN: Cambiado a /pronostico (en singular)
+  // Sincronización de parámetros URL para Pronósticos
   const pronosticosHref = coords
     ? `/pronostico?lat=${coords.lat}&lng=${coords.lng}&lugar=${encodeURIComponent(lugar || 'Buga')}`
     : '/pronostico'
 
+  // SOLUCIÓN: Activación de enlace dinámico y persistencia de ubicación para Alertas
+  const alertasHref = coords
+    ? `/alertas?lat=${coords.lat}&lng=${coords.lng}&lugar=${encodeURIComponent(lugar || 'Buga')}`
+    : '/alertas'
+
   const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { href: pronosticosHref, label: 'Pronósticos', icon: CloudRain, disabled: false },
-    { href: null, label: 'Alertas', icon: Bell, badge: alertasCount },
+    { href: pronosticosHref, label: 'Pronósticos', icon: CloudRain },
+    { href: alertasHref, label: 'Alertas', icon: Bell, badge: alertasCount },
   ]
 
   const navItemsMobile = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
     { href: pronosticosHref, label: 'Pronósticos', icon: CloudRain },
-    { href: null, label: 'Alertas', icon: Bell, badge: alertasCount },
+    { href: alertasHref, label: 'Alertas', icon: Bell, badge: alertasCount },
     { href: null, label: 'Perfil', icon: User },
   ]
 
@@ -81,15 +86,19 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
         {/* NAV ESCRITORIO */}
         <nav className="flex-1 p-3">
           {navItems.map(({ href, label, icon: Icon, badge, disabled }) => {
-            // SOLUCIÓN: Cambiado a /pronostico en la validación de ruta activa
-            const active = href !== null && (pathname === href || (label === 'Pronósticos' && pathname === '/pronostico'))
+            // SOLUCIÓN: Agregada validación de ruta activa limpia para /pronostico y /alertas sin query params
+            const active = href !== null && (
+              pathname === href || 
+              (label === 'Pronósticos' && pathname === '/pronostico') ||
+              (label === 'Alertas' && pathname === '/alertas')
+            )
             const isDisabled = disabled === true || href === null
 
             const content = (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: collapsed ? '10px 0' : '10px 12px',
-                justifyContent: collapsed ? 'center' : 'flex-start',
+                justifyment: collapsed ? 'center' : 'flex-start',
                 margin: '2px 0', borderRadius: '10px',
                 background: active ? '#eff6ff' : 'transparent',
                 color: isDisabled ? '#cbd5e1' : active ? '#2563eb' : '#64748b',
@@ -125,7 +134,7 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
         </nav>
 
         {/* USUARIO ESCRITORIO */}
-        <div style={{ padding: collapsed ? '14px 0' : '14px 12px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start' }}>
+        <div style={{ padding: collapsed ? '14px 0' : '14px 12px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyment: collapsed ? 'center' : 'flex-start' }}>
           {!collapsed && (
             <div style={{ width: '100%' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0f172a' }}>Kevin Sanchez</div>
@@ -144,8 +153,12 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
       {/* BOTTOM NAVIGATION MÓVIL */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 flex items-center justify-around pb-6 pt-3 px-2 z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] rounded-t-3xl">
         {navItemsMobile.map(({ href, label, icon: Icon, badge }) => {
-          // SOLUCIÓN: Cambiado a /pronostico en la validación de ruta activa móvil
-          const active = href !== null && (pathname === href || (label === 'Pronósticos' && pathname === '/pronostico'))
+          // SOLUCIÓN: Agregada validación de ruta activa limpia también en la barra de navegación del celular
+          const active = href !== null && (
+            pathname === href || 
+            (label === 'Pronósticos' && pathname === '/pronostico') ||
+            (label === 'Alertas' && pathname === '/alertas')
+          )
           const disabled = href === null
 
           return (
