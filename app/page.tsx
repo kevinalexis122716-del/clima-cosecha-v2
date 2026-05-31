@@ -50,27 +50,25 @@ function getIconoCondicion(mm: number, prob: number) {
 
 export default function Home() {
   const [coords, setCoords] = useState(() => {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('coords')
-    return saved ? JSON.parse(saved) : { lat: 3.9044, lng: -76.2960 }
-  }
-  return { lat: 3.9044, lng: -76.2960 }
-})
-const [lugar, setLugar] = useState(() => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('lugar') || 'Buga'
-  }
-  return 'Buga'
-})
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('coords')
+      return saved ? JSON.parse(saved) : { lat: 3.9044, lng: -76.2960 }
+    }
+    return { lat: 3.9044, lng: -76.2960 }
+  })
+  const [lugar, setLugar] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lugar') || 'Buga'
+    }
+    return 'Buga'
+  })
   const [, setSidebarCollapsed] = useState(false)
 
-  // CONFIGURADO: Sincronizado intervalo de actualización a 15 minutos (900000 ms)
   const { data: clima, isLoading: loadingClima } = useSWR(
     `/api/clima?lat=${coords.lat}&lng=${coords.lng}`,
     fetcher, { refreshInterval: 900000 }
   )
 
-  // CONFIGURADO: Sincronizado intervalo de actualización a 15 minutos (900000 ms)
   const { data: pronostico, isLoading: loadingPron } = useSWR(
     `/api/pronostico?lat=${coords.lat}&lng=${coords.lng}`,
     fetcher, { refreshInterval: 900000 }
@@ -78,6 +76,7 @@ const [lugar, setLugar] = useState(() => {
 
   const onClickMapa = useCallback(async (lat: number, lng: number) => {
     setCoords({ lat, lng })
+    localStorage.setItem('coords', JSON.stringify({ lat, lng }))
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=es`
@@ -86,12 +85,12 @@ const [lugar, setLugar] = useState(() => {
       const nombre = data.address?.city || data.address?.town ||
         data.address?.village || data.address?.county || 'Ubicación seleccionada'
       setLugar(nombre)
+      localStorage.setItem('lugar', nombre)
     } catch { setLugar('Ubicación seleccionada') }
   }, [])
 
   const horario: Record<string, number | string>[] = Array.isArray(pronostico?.horario) ? pronostico.horario : []
   
-  // CONFIGURADO: Lógica estricta de alertas filtrando solo precipitaciones mayores a 5 mm por hora
   const alertasCount = horario.filter((h) => Number(h.precipitacion) > 5).length
 
   const kpis = [
