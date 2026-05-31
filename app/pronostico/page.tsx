@@ -30,48 +30,123 @@ function esHoy(fecha: string) {
   return fecha === new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' })
 }
 
-function getCondicion(mm: number, prob: number): { label: string; icono: string } {
-  if (mm > 10) return { label: 'Tormenta', icono: '⛈️' }
-  if (mm > 5)  return { label: 'Lluvioso', icono: '🌧️' }
-  if (mm > 2)  return { label: 'Lluvia moderada', icono: '🌦️' }
-  if (mm > 0.5) return { label: 'Lluvia leve', icono: '🌦️' }
-  if (prob > 70) return { label: 'Muy nublado', icono: '☁️' }
-  if (prob > 40) return { label: 'Parcialmente nublado', icono: '⛅' }
-  if (prob > 20) return { label: 'Mayormente soleado', icono: '🌤️' }
-  return { label: 'Soleado', icono: '☀️' }
+interface HoraData { hora: string; temp: number; precipitacion: number; probabilidad: number; humedad: number; viento: number }
+interface DiaData { fecha: string; tempMax: number; tempMin: number; precipitacion: number; probabilidad: number; viento: number; humedad: number }
+
+// LÓGICA: Evaluación estricta hora a hora y ventana de 2 horas
+function getClasificacion(horas: HoraData[], mmTotal: number, prob: number): { label: string; icono: string } {
+  if (!horas || horas.length === 0) {
+    if (mmTotal > 30) return { label: 'Posible Tormenta', icono: '⛈️' }
+    if (mmTotal >= 20) return { label: 'Lluvia muy fuerte', icono: '🌧️' }
+    if (mmTotal >= 10) return { label: 'Lluvia fuerte', icono: '🌧️' }
+    if (mmTotal >= 2) return { label: 'Lluvia moderada', icono: '🌦️' }
+    if (mmTotal > 0) return { label: 'Lluvia débil', icono: '🌦️' }
+    if (prob > 70) return { label: 'Seco (Nublado)', icono: '☁️' }
+    if (prob > 40) return { label: 'Seco (Parcial)', icono: '⛅' }
+    return { label: 'Seco', icono: '☀️' }
+  }
+
+  let max1h = 0;
+  let max2h = 0;
+
+  for (let i = 0; i < horas.length; i++) {
+    if (horas[i].precipitacion > max1h) {
+      max1h = horas[i].precipitacion;
+    }
+    if (i < horas.length - 1) {
+      const sum2h = horas[i].precipitacion + horas[i+1].precipitacion;
+      if (sum2h > max2h) {
+        max2h = sum2h;
+      }
+    }
+  }
+
+  if (max2h >= 30) return { label: 'Tormenta', icono: '⛈️' }
+  if (max1h >= 20) return { label: 'Lluvia muy fuerte', icono: '⛈️' }
+  if (max1h >= 10) return { label: 'Lluvia fuerte', icono: '🌧️' }
+  if (max1h >= 2) return { label: 'Lluvia moderada', icono: '🌦️' }
+  if (max1h > 0 || mmTotal > 0) return { label: 'Lluvia débil', icono: '🌦️' }
+  
+  if (prob > 70) return { label: 'Seco (Nublado)', icono: '☁️' }
+  if (prob > 40) return { label: 'Seco (Parcial)', icono: '⛅' }
+  return { label: 'Seco', icono: '☀️' }
 }
 
-function getDescripcionDia(mm: number, prob: number, tempMax: number, tempMin: number, humedad: number): string {
-  const condicion = getCondicion(mm, prob)
-  let desc = `Se espera un día ${condicion.label.toLowerCase()}`
+function getDescripcionDia(mm: number, prob: number, tempMax: number, tempMin: number, humedad: number, labelCondicion: string): string {
+  let desc = `Se esperan condiciones de ${labelCondicion.toLowerCase()}`
 
   if (mm > 2) {
-    desc += ` con ${mm.toFixed(1)} mm de lluvia acumulada`
+    desc += ` con ${mm.toFixed(1)} mm de lluvia acumulada total en el día`
     if (prob > 70) desc += ` y alta probabilidad de precipitación`
   } else if (prob > 50) {
     desc += ` con posibilidad de lluvia leve`
   } else {
-    desc += ` con condiciones estables`
+    desc += ` y tiempo estable`
   }
 
   if (tempMax - tempMin > 8) {
-    desc += `. Se esperan variaciones importantes de temperatura entre ${tempMin}°C y ${tempMax}°C`
+    desc += `. Temperaturas variables entre ${tempMin}°C y ${tempMax}°C`
   } else {
     desc += `. Temperaturas entre ${tempMin}°C y ${tempMax}°C`
   }
 
+  // ESCALA NEUTRAL DE HUMEDAD
   if (humedad > 85) {
-    desc += `. Humedad muy alta, condiciones favorables para enfermedades fungosas en cultivos`
+    desc += `. Humedad muy alta`
   } else if (humedad > 70) {
-    desc += `. Humedad moderada-alta`
+    desc += `. Humedad alta`
+  } else if (humedad > 50) {
+    desc += `. Humedad media`
+  } else {
+    desc += `. Humedad baja`
   }
 
   desc += '.'
   return desc
 }
 
-interface HoraData { hora: string; temp: number; precipitacion: number; probabilidad: number; humedad: number; viento: number }
-interface DiaData { fecha: string; tempMax: number; tempMin: number; precipitacion: number; probabilidad: number; viento: number; humedad: number }
+// RESUMEN TÉCNICO AGRONÓMICO
+function generarResumenTecnico(dia: DiaData, horas: HoraData[], clase: {label: string}, tecnico: any) {
+  const max1h = horas?.length ? Math.max(...horas.map(h => h.precipitacion)) : 0;
+  
+  let resumen = `Para la jornada se prevé un escenario meteorológico catalogado como ${clase.label.toLowerCase()}. `;
+  
+  // 1. Impacto de precipitaciones y operaciones
+  if (dia.precipitacion > 0) {
+    resumen += `Se estima un acumulado total de ${dia.precipitacion.toFixed(1)} mm`;
+    if (max1h > 0) resumen += `, con una intensidad máxima proyectada de ${max1h.toFixed(1)} mm/h. `;
+    else resumen += `. `;
+    
+    if (clase.label === 'Tormenta' || clase.label === 'Lluvia muy fuerte') {
+      resumen += `¡ALERTA!: Las precipitaciones generarán alta escorrentía y saturación rápida del perfil del suelo. Se requiere suspensión inminente de labores de corte y transporte para evitar daños estructurales en los suelos (compactación severa) y atascos de maquinaria pesada. `;
+    } else if (clase.label === 'Lluvia fuerte' || clase.label === 'Lluvia moderada') {
+      resumen += `Se advierte un incremento importante en la humedad del suelo ("piso") que podría reducir significativamente la eficiencia de los frentes de cosecha mecánica. Se recomienda evaluar el estado de los callejones y programar el transporte con alta precaución. `;
+    } else {
+      resumen += `La precipitación proyectada es leve y no debería representar una limitante severa para las operaciones, permitiendo mantener los frentes de corte activos. `;
+    }
+  } else {
+    resumen += `La ausencia de precipitaciones significativas garantiza condiciones de piso óptimas para el tránsito ininterrumpido de maquinaria, el corte y el alce de la caña. `;
+  }
+
+  // 2. Temperaturas y estrés
+  resumen += `\n\nTérmicamente, la amplitud será de ${(dia.tempMax - dia.tempMin).toFixed(1)}°C (mínima de ${dia.tempMin}°C, máxima de ${dia.tempMax}°C), condicionando una evapotranspiración estimada de ${tecnico?.evapotranspiracion ?? '--'} mm/día. `;
+
+  // 3. Humedad en escala neutral
+  let nivelHumedad = '';
+  if (dia.humedad > 85 || (tecnico?.horasHR90 && tecnico.horasHR90 > 4)) {
+    nivelHumedad = 'niveles muy altos';
+  } else if (dia.humedad > 70) {
+    nivelHumedad = 'niveles altos';
+  } else if (dia.humedad > 50) {
+    nivelHumedad = 'niveles medios';
+  } else {
+    nivelHumedad = 'niveles bajos';
+  }
+
+  resumen += `La humedad relativa promediará un ${dia.humedad}%, manteniéndose en ${nivelHumedad}.`;
+
+  return resumen;
+}
 
 function calcularEventos(horas: HoraData[]) {
   if (!horas || horas.length === 0) return null
@@ -81,9 +156,7 @@ function calcularEventos(horas: HoraData[]) {
   const horaMax = horas.find(h => h.temp === tempMax)
   const horaMin = horas.find(h => h.temp === tempMin)
 
-  // Inicio lluvia: primera hora con más de 2mm
   const inicioLluvia = horas.find(h => h.precipitacion > 2)
-  // Fin lluvia: después del inicio, primera hora con menos de 2mm
   let finLluvia = null
   if (inicioLluvia) {
     const idx = horas.indexOf(inicioLluvia)
@@ -193,7 +266,6 @@ export default function Pronosticos() {
     fetcher, { refreshInterval: 1200000 }
   )
 
-  // Agrupar los datos horarios por día para que la gráfica funcione
   const horarioPlano: HoraData[] = Array.isArray(pronostico?.horario) ? pronostico.horario : []
   const horarioPorDia: Record<string, HoraData[]> = {}
   horarioPlano.forEach(h => {
@@ -206,7 +278,8 @@ export default function Pronosticos() {
   const diaActual = diario[diaSeleccionado]
   const horasDia: HoraData[] = diaActual ? (horarioPorDia[diaActual.fecha] || []) : []
   
-  const condicion = diaActual ? getCondicion(diaActual.precipitacion, diaActual.probabilidad) : null
+  const condicion = diaActual ? getClasificacion(horasDia, diaActual.precipitacion, diaActual.probabilidad) : null
+  
   const eventos = calcularEventos(horasDia)
   const tecnico = diaActual && eventos ? calcularDetallesTecnicos(horasDia, diaActual.tempMax, diaActual.tempMin) : null
 
@@ -225,7 +298,6 @@ export default function Pronosticos() {
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         
-        {/* TOPBAR MÓVIL */}
         <div className="flex md:hidden items-center justify-start bg-white px-4 py-3 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2">
             <Image src="/iconos/probabilidad.png" alt="logo" width={28} height={28} style={{ objectFit: 'contain' }} />
@@ -236,7 +308,6 @@ export default function Pronosticos() {
           </div>
         </div>
 
-        {/* TOPBAR ESCRITORIO / INFO LOCACIÓN MÓVIL */}
         <div className="bg-white border-b border-slate-200 px-4 md:px-5 py-2 md:py-[10px] flex items-center justify-between shrink-0 md:h-[52px]">
           <div className="flex items-center gap-2">
             <MapPin size={15} color="#2563eb" />
@@ -247,10 +318,8 @@ export default function Pronosticos() {
           </div>
         </div>
 
-        {/* CONTENIDO PRINCIPAL SCROLLEABLE */}
         <div className="flex-1 overflow-y-auto p-3 md:p-5 pb-[90px] md:pb-5">
           
-          {/* TÍTULO */}
           <div style={{ marginBottom: '20px' }}>
             <h1 style={{ fontSize: isMobile ? '1.3rem' : '1.6rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Pronóstico 5 días</h1>
             <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '4px 0 0' }}>
@@ -258,7 +327,6 @@ export default function Pronosticos() {
             </p>
           </div>
 
-          {/* TARJETAS 5 DÍAS */}
           {diario.length === 0 ? (
             <div style={{ color: '#94a3b8', fontSize: '0.9rem', padding: '20px' }}>Cargando pronóstico...</div>
           ) : (
@@ -268,8 +336,10 @@ export default function Pronosticos() {
               gap: '10px', marginBottom: '24px',
             }}>
               {diario.map((dia, i) => {
-                const cond = getCondicion(dia.precipitacion, dia.probabilidad)
-                const activo = i === diaSeleccionado
+                const horasEsteDia = horarioPorDia[dia.fecha] || [];
+                const cond = getClasificacion(horasEsteDia, dia.precipitacion, dia.probabilidad);
+                const activo = i === diaSeleccionado;
+
                 return (
                   <div key={dia.fecha} onClick={() => setDiaSeleccionado(i)} style={{
                     background: activo ? '#ffffff' : '#f8fafc',
@@ -306,8 +376,7 @@ export default function Pronosticos() {
             </div>
           )}
 
-          {/* DETALLE DEL DÍA */}
-          {diaActual && (
+          {diaActual && condicion && (
             <div>
               <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', marginBottom: '16px' }}>
                 Detalle del pronóstico
@@ -318,31 +387,21 @@ export default function Pronosticos() {
                 gridTemplateColumns: isMobile ? '1fr' : '280px 1fr',
                 gap: '16px', marginBottom: '16px',
               }}>
-                {/* INFO GENERAL */}
                 <div style={{
                   background: '#ffffff', borderRadius: '14px', padding: '18px',
                   border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', marginBottom: '16px' }}>
                     INFORMACIÓN GENERAL DEL DÍA
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                    <span style={{ fontSize: '2.5rem' }}>{condicion?.icono}</span>
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{condicion?.label}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', lineHeight: 1.4 }}>
-                        {getDescripcionDia(diaActual.precipitacion, diaActual.probabilidad, diaActual.tempMax, diaActual.tempMin, diaActual.humedad)}
-                      </div>
-                    </div>
-                  </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {[
                       { icon: <Thermometer size={14} color="#ef4444" />, label: 'Temperatura máxima', valor: `${diaActual.tempMax}°C`, color: '#ef4444' },
                       { icon: <Thermometer size={14} color="#2563eb" />, label: 'Temperatura mínima', valor: `${diaActual.tempMin}°C`, color: '#2563eb' },
                       { icon: <Droplets size={14} color="#0ea5e9" />, label: 'Lluvia acumulada', valor: `${diaActual.precipitacion} mm`, color: '#0ea5e9' },
                       { icon: <Droplets size={14} color="#64748b" />, label: 'Probabilidad de lluvia', valor: `${diaActual.probabilidad}%`, color: '#64748b' },
-                      { icon: <Wind size={14} color="#10b981" />, label: 'Viento promedio', valor: `${diaActual.viento} km/h O`, color: '#10b981' },
+                      { icon: <Wind size={14} color="#10b981" />, label: 'Viento promedio', valor: `${diaActual.viento} km/h`, color: '#10b981' },
                       { icon: <Droplets size={14} color="#8b5cf6" />, label: 'Humedad promedio', valor: `${diaActual.humedad}%`, color: '#8b5cf6' },
                       { icon: <Clock size={14} color="#f59e0b" />, label: 'Presión atmosférica', valor: `${tecnico?.presion ?? 903} hPa`, color: '#f59e0b' },
                     ].map((item, i) => (
@@ -356,7 +415,6 @@ export default function Pronosticos() {
                   </div>
                 </div>
 
-                {/* GRÁFICA */}
                 <div style={{
                   background: '#ffffff', borderRadius: '14px', padding: '18px',
                   border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
@@ -388,33 +446,24 @@ export default function Pronosticos() {
                 </div>
               </div>
 
-              {/* EVENTOS + TÉCNICO */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr',
                 gap: '16px',
               }}>
-
-                {/* RESUMEN */}
                 <div style={{
                   background: '#ffffff', borderRadius: '14px', padding: '18px',
                   border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
                     <span>📋</span>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>Resumen del día</span>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>Resumen agronómico del día</span>
                   </div>
-                  <p style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
-                    {getDescripcionDia(diaActual.precipitacion, diaActual.probabilidad, diaActual.tempMax, diaActual.tempMin, diaActual.humedad)}
+                  <p style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-line' }}>
+                    {generarResumenTecnico(diaActual, horasDia, condicion, tecnico)}
                   </p>
-                  {diaActual.precipitacion > 2 && (
-                    <p style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.6, marginTop: '8px' }}>
-                      Se recomienda suspender o reducir las operaciones de cosecha durante las horas de mayor precipitación.
-                    </p>
-                  )}
                 </div>
 
-                {/* EVENTOS DESTACADOS */}
                 <div style={{
                   background: '#ffffff', borderRadius: '14px', padding: '18px',
                   border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
@@ -495,7 +544,6 @@ export default function Pronosticos() {
                   )}
                 </div>
 
-                {/* DETALLES TÉCNICOS */}
                 <div style={{
                   background: '#ffffff', borderRadius: '14px', padding: '18px',
                   border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
