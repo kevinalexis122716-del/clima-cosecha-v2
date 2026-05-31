@@ -36,9 +36,10 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
     onToggle?.(next)
   }
 
+  // SOLUCIÓN: Cambiado a /pronostico (en singular)
   const pronosticosHref = coords
-    ? `/pronosticos?lat=${coords.lat}&lng=${coords.lng}&lugar=${encodeURIComponent(lugar || 'Buga')}`
-    : '/pronosticos'
+    ? `/pronostico?lat=${coords.lat}&lng=${coords.lng}&lugar=${encodeURIComponent(lugar || 'Buga')}`
+    : '/pronostico'
 
   const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -80,7 +81,8 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
         {/* NAV ESCRITORIO */}
         <nav className="flex-1 p-3">
           {navItems.map(({ href, label, icon: Icon, badge, disabled }) => {
-            const active = href !== null && (pathname === href || (label === 'Pronósticos' && pathname === '/pronosticos'))
+            // SOLUCIÓN: Cambiado a /pronostico en la validación de ruta activa
+            const active = href !== null && (pathname === href || (label === 'Pronósticos' && pathname === '/pronostico'))
             const isDisabled = disabled === true || href === null
 
             const content = (
@@ -142,7 +144,8 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
       {/* BOTTOM NAVIGATION MÓVIL */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 flex items-center justify-around pb-6 pt-3 px-2 z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] rounded-t-3xl">
         {navItemsMobile.map(({ href, label, icon: Icon, badge }) => {
-          const active = href !== null && (pathname === href || (label === 'Pronósticos' && pathname === '/pronosticos'))
+          // SOLUCIÓN: Cambiado a /pronostico en la validación de ruta activa móvil
+          const active = href !== null && (pathname === href || (label === 'Pronósticos' && pathname === '/pronostico'))
           const disabled = href === null
 
           return (
