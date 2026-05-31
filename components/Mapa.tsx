@@ -1,5 +1,4 @@
 'use client'
-
 import { useEffect, useRef } from 'react'
 
 interface MapaProps {
@@ -9,7 +8,7 @@ interface MapaProps {
 }
 
 export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
- const mapaRef = useRef<HTMLDivElement>(null)
+  const mapaRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapInstanceRef = useRef<any>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,13 +16,10 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
 
   useEffect(() => {
     if (!mapaRef.current || mapInstanceRef.current) return
-
     const iniciarMapa = async () => {
       const maplibregl = (await import('maplibre-gl')).default
       await import('maplibre-gl/dist/maplibre-gl.css')
-
       const owmKey = process.env.NEXT_PUBLIC_OWM_KEY || ''
-
       const map = new maplibregl.Map({
         container: mapaRef.current!,
         style: {
@@ -56,22 +52,22 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
           id: 'nubes-layer',
           type: 'raster',
           source: 'nubes',
-          paint: { 'raster-opacity': 0.4 },
+          paint: { 'raster-opacity': 0.3 },
         })
 
-        // Capa de precipitación encima
-        map.addSource('precipitacion', {
+        // Capa de RADAR (reemplaza precipitation_new)
+        map.addSource('radar', {
           type: 'raster',
           tiles: [
-            `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${owmKey}`
+            `https://tile.openweathermap.org/map/radar/{z}/{x}/{y}.png?appid=${owmKey}`
           ],
           tileSize: 256,
           attribution: '© OpenWeatherMap',
         })
         map.addLayer({
-          id: 'precipitacion-layer',
+          id: 'radar-layer',
           type: 'raster',
-          source: 'precipitacion',
+          source: 'radar',
           paint: { 'raster-opacity': 0.85 },
         })
 
@@ -92,7 +88,6 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
         markerRef.current = marker
       })
 
-      // Click para cambiar ubicación
       map.on('click', (e) => {
         const newLat = e.lngLat.lat
         const newLng = e.lngLat.lng
@@ -108,7 +103,6 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
     }
 
     iniciarMapa()
-
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove()
@@ -124,9 +118,29 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
   }, [lat, lng])
 
   return (
-    <div
-      ref={mapaRef}
-      style={{ width: '100%', height: '100%', minHeight: '500px' }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '500px' }}>
+      <div ref={mapaRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Leyenda radar estilo OpenWeatherMap */}
+      <div style={{
+        position: 'absolute', bottom: '10px', left: '10px', zIndex: 10,
+        background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(8px)',
+        borderRadius: '10px', padding: '6px 12px',
+        border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+        display: 'flex', flexDirection: 'column', gap: '3px'
+      }}>
+        <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8', marginBottom: '2px' }}>
+          RADAR mm/h
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '0.65rem', color: '#64748b' }}>0</span>
+          <div style={{
+            width: '120px', height: '10px', borderRadius: '6px',
+            background: 'linear-gradient(to right, #a0d8f0, #4fc3f7, #00e676, #ffee58, #ff7043, #b71c1c)',
+          }} />
+          <span style={{ fontSize: '0.65rem', color: '#64748b' }}>40+</span>
+        </div>
+      </div>
+    </div>
   )
 }
