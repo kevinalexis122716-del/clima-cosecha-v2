@@ -41,7 +41,7 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
     ? `/pronostico?lat=${coords.lat}&lng=${coords.lng}&lugar=${encodeURIComponent(lugar || 'Buga')}`
     : '/pronostico'
 
-  // SOLUCIÓN: Activación de enlace dinámico y persistencia de ubicación para Alertas
+  // Sincronización de parámetros URL para Alertas
   const alertasHref = coords
     ? `/alertas?lat=${coords.lat}&lng=${coords.lng}&lugar=${encodeURIComponent(lugar || 'Buga')}`
     : '/alertas'
@@ -85,20 +85,20 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
 
         {/* NAV ESCRITORIO */}
         <nav className="flex-1 p-3">
-          {navItems.map(({ href, label, icon: Icon, badge, disabled }) => {
-            // SOLUCIÓN: Agregada validación de ruta activa limpia para /pronostico y /alertas sin query params
+          {navItems.map(({ href, label, icon: Icon, badge }) => {
+            // CORREGIDO: Ya no se descarga la propiedad 'disabled' inexistente
             const active = href !== null && (
               pathname === href || 
               (label === 'Pronósticos' && pathname === '/pronostico') ||
               (label === 'Alertas' && pathname === '/alertas')
             )
-            const isDisabled = disabled === true || href === null
+            const isDisabled = href === null
 
             const content = (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: collapsed ? '10px 0' : '10px 12px',
-                justifyment: collapsed ? 'center' : 'flex-start',
+                justifyContent: collapsed ? 'center' : 'flex-start',
                 margin: '2px 0', borderRadius: '10px',
                 background: active ? '#eff6ff' : 'transparent',
                 color: isDisabled ? '#cbd5e1' : active ? '#2563eb' : '#64748b',
@@ -134,14 +134,14 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
         </nav>
 
         {/* USUARIO ESCRITORIO */}
-        <div style={{ padding: collapsed ? '14px 0' : '14px 12px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyment: collapsed ? 'center' : 'flex-start' }}>
+        <div style={{ padding: collapsed ? '14px 0' : '14px 12px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start' }}>
           {!collapsed && (
             <div style={{ width: '100%' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0f172a' }}>Kevin Sanchez</div>
               <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginBottom: '6px' }}>Desarrollador</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: minutos >= 15 ? '#fff7ed' : '#f0fdf4', border: `1px solid ${minutos >= 15 ? '#fed7aa' : '#bbf7d0'}`, borderRadius: '8px', padding: '4px 8px' }}>
                 <span style={{ width: '6px', height: '6px', background: minutos >= 15 ? '#f97316' : '#10b981', borderRadius: '50%', flexShrink: 0 }} />
-                <span style={{ fontSize: '0.62rem', color: minutos >= 15 ? '#c2410c' : '#15803d', fontWeight: 600 }}>
+                <span style={{ fontSize: '0.62rem', color: minutos >= 15 ? '#c2410c' : '#15803d', fontStyle: 'normal', fontWeight: 600 }}>
                   {!ultimaActualizacion ? 'Cargando...' : minutos === 0 ? 'Actualizado ahora' : `Hace ${minutos} min`}
                 </span>
               </div>
@@ -153,7 +153,6 @@ export default function Sidebar({ alertasCount = 0, onToggle, ultimaActualizacio
       {/* BOTTOM NAVIGATION MÓVIL */}
       <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 flex items-center justify-around pb-6 pt-3 px-2 z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] rounded-t-3xl">
         {navItemsMobile.map(({ href, label, icon: Icon, badge }) => {
-          // SOLUCIÓN: Agregada validación de ruta activa limpia también en la barra de navegación del celular
           const active = href !== null && (
             pathname === href || 
             (label === 'Pronósticos' && pathname === '/pronostico') ||
