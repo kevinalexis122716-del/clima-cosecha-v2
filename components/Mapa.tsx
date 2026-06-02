@@ -43,7 +43,7 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
       })
 
       map.on('load', () => {
-        // Capa de nubes con opacidad muy baja — solo referencia visual, no tapa la precipitación
+        // Capa de nubes con opacidad baja
         map.addSource('nubes', {
           type: 'raster',
           tiles: [
@@ -56,15 +56,14 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
           id: 'nubes-layer',
           type: 'raster',
           source: 'nubes',
-          // Bajamos de 0.4 a 0.15 — referencia visual sin distorsionar colores de precipitación
           paint: { 'raster-opacity': 0.15 },
         })
 
-        // Capa de precipitación encima — precipitation_new usa la paleta verde→amarillo→rojo
+        // Capa de precipitación API 2.0 (Capa PR0 estándar)
         map.addSource('precipitacion', {
           type: 'raster',
           tiles: [
-            `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${owmKey}`
+            `https://maps.openweathermap.org/maps/2.0/weather/PR0/{z}/{x}/{y}?appid=${owmKey}`
           ],
           tileSize: 256,
           attribution: '© OpenWeatherMap',
@@ -128,50 +127,35 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
     <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '500px' }}>
       <div ref={mapaRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* Leyenda de intensidad de precipitación — igual a OpenWeatherMap */}
+      {/* LEYENDA IDÉNTICA A LA NATIVA DE OPENWEATHERMAP */}
       <div style={{
         position: 'absolute',
-        bottom: '28px',
-        left: '12px',
-        background: 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(6px)',
-        borderRadius: '10px',
-        padding: '10px 14px',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.18)',
+        bottom: '24px',
+        right: '12px',
+        background: 'rgba(255,255,255,0.95)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: '30px',
+        padding: '8px 16px',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
         zIndex: 10,
-        minWidth: '210px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
       }}>
-        <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#374151', letterSpacing: '0.8px', marginBottom: '7px' }}>
-          INTENSIDAD DE PRECIPITACIÓN
+        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#f97316', display: 'flex', gap: '4px' }}>
+          Precipitación <span style={{ color: '#64748b', fontWeight: 600 }}>0 mm/h</span>
         </div>
-        {/* Barra de gradiente igual a la paleta precipitation_new de OWM */}
+        
         <div style={{
-          height: '10px',
-          borderRadius: '5px',
-          background: 'linear-gradient(to right, #a8e4ff, #59b4ff, #00d4aa, #00c800, #ffff00, #ff9600, #ff0000, #c80000)',
-          marginBottom: '5px',
+          width: '120px',
+          height: '6px',
+          borderRadius: '3px',
+          // Gradiente exacto de la documentación API 2.0 PR0
+          background: 'linear-gradient(to right, rgba(136,184,237,0.1), #88b8ed, #408ce0, #24c79f, #14a60f, #ebd01a, #e38612, #d9251c, #9c1752)',
         }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>0 mm/h</span>
-          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>0.2</span>
-          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>1</span>
-          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>4</span>
-          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>10</span>
-          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>40+ mm/h</span>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', marginTop: '7px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#59b4ff' }} />
-            <span style={{ fontSize: '0.6rem', color: '#374151' }}>Ligera</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffff00' }} />
-            <span style={{ fontSize: '0.6rem', color: '#374151' }}>Moderada</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff0000' }} />
-            <span style={{ fontSize: '0.6rem', color: '#374151' }}>Intensa</span>
-          </div>
+        
+        <div style={{ fontSize: '0.65rem', fontWeight: 600, color: '#64748b' }}>
+          40 mm/h
         </div>
       </div>
 
