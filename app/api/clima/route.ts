@@ -2,14 +2,13 @@ import { NextResponse } from 'next/server'
 
 const TOMORROW_KEY = process.env.TOMORROW_API_KEY
 const WEATHERAPI_KEY = process.env.WEATHERAPI_KEY
+const OWM_KEY = process.env.NEXT_PUBLIC_OWM_KEY
 
-// Tomorrow.io — variables meteorológicas generales (temperatura, viento, presión, etc.)
-// NO se usa su precipitationIntensity porque es tasa mm/h, no acumulado real de la hora.
 async function getTomorrow(lat: number, lng: number) {
   try {
     const res = await fetch(
       `https://api.tomorrow.io/v4/weather/realtime?location=${lat},${lng}&apikey=${TOMORROW_KEY}&units=metric`,
-      { next: { revalidate: 600 } }
+      { next: { revalidate: 60 } }
     )
     if (!res.ok) return null
     const data = await res.json()
@@ -27,9 +26,6 @@ async function getTomorrow(lat: number, lng: number) {
   } catch { return null }
 }
 
-// Open-Meteo — fuente exclusiva de precipitación y probabilidad.
-// "precipitation" en el campo current = mm acumulados en la hora en curso (dato real, no tasa).
-// "precipitation_probability" = probabilidad para el período actual.
 async function getOpenMeteo(lat: number, lng: number) {
   try {
     const res = await fetch(
@@ -37,7 +33,7 @@ async function getOpenMeteo(lat: number, lng: number) {
       `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,` +
       `wind_speed_10m,wind_direction_10m,surface_pressure,visibility,precipitation_probability,uv_index` +
       `&wind_speed_unit=kmh&timezone=America%2FBogota`,
-      { next: { revalidate: 600 } }
+      { next: { revalidate: 60 } }
     )
     if (!res.ok) return null
     const data = await res.json()
@@ -50,7 +46,6 @@ async function getOpenMeteo(lat: number, lng: number) {
       direccionViento: c.wind_direction_10m,
       presion: c.surface_pressure,
       visibilidad: c.visibility / 1000,
-      // Precipitación acumulada en la hora en curso — dato correcto para toma de decisiones
       precipitacion: c.precipitation ?? 0,
       probabilidad: c.precipitation_probability ?? 0,
       uvIndex: c.uv_index ?? null,
@@ -59,13 +54,28 @@ async function getOpenMeteo(lat: number, lng: number) {
   } catch { return null }
 }
 
-// WeatherAPI — solo como fallback para variables meteorológicas generales.
-// Su precip_mm NO se usa; su probabilidad siempre es 0 (la API no lo entrega).
+async function getOpenWeatherMap(lat: number, lng: number) {
+  try {
+    const res = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${OWM_KEY}&units=metric`,
+      { next: { revalidate: 600 } }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    // rain.1h = mm acumulados en la última hora real — dato de estaciones + radar
+    const precipitacion = data.rain?.['1h'] ?? data.snow?.['1h'] ?? 0
+    return {
+      precipitacion: parseFloat(precipitacion.toFixed(2)),
+      fuente: 'openweathermap',
+    }
+  } catch { return null }
+}
+
 async function getWeatherApi(lat: number, lng: number) {
   try {
     const res = await fetch(
       `https://api.weatherapi.com/v1/current.json?key=${WEATHERAPI_KEY}&q=${lat},${lng}&aqi=no`,
-      { next: { revalidate: 600 } }
+      { next: { revalidate: 60 } }
     )
     if (!res.ok) return null
     const data = await res.json()
@@ -102,13 +112,13 @@ export async function GET(request: Request) {
   const lat = parseFloat(searchParams.get('lat') || '3.9038')
   const lng = parseFloat(searchParams.get('lng') || '-76.2982')
 
-  const [tomorrow, openmeteo, weatherapi] = await Promise.all([
+  const [tomorrow, openmeteo, weatherapi, owm] = await Promise.all([
     getTomorrow(lat, lng),
     getOpenMeteo(lat, lng),
     getWeatherApi(lat, lng),
+    getOpenWeatherMap(lat, lng),
   ])
 
-  // Sin Open-Meteo no hay precipitación confiable — respondemos con advertencia explícita.
   if (!openmeteo) {
     const meteo = tomorrow || weatherapi
     if (!meteo) {
@@ -129,23 +139,26 @@ export async function GET(request: Request) {
       impacto: null,
       advertencia: 'Precipitación no disponible — Open-Meteo sin respuesta',
       fuentes: {
-        tomorrow: tomorrow   ? 'ok' : 'error',
+        tomorrow: tomorrow ? 'ok' : 'error',
         openmeteo: 'error',
         weatherapi: weatherapi ? 'ok' : 'error',
+        openweathermap: owm ? 'ok' : 'error',
       },
       timestamp: new Date().toISOString(),
     })
   }
 
-  // Variables meteorológicas generales: Tomorrow primero, luego Open-Meteo, luego WeatherAPI.
   const meteo = tomorrow || openmeteo || weatherapi!
 
-  // Precipitación y probabilidad: SOLO Open-Meteo.
-  // precipitation = mm acumulados en la hora en curso (no es tasa mm/h).
-  const precipitacion = parseFloat(openmeteo.precipitacion.toFixed(2))
-  const probabilidad  = Math.round(openmeteo.probabilidad)
+  // Precipitación: tomamos el mayor valor entre OWM y Open-Meteo
+  // OWM rain.1h es acumulado real de la última hora — más reactivo a tormentas
+  // Open-Meteo es acumulado desde inicio de la hora — puede estar retrasado
+  const precipOWM = owm?.precipitacion ?? 0
+  const precipOM = parseFloat(openmeteo.precipitacion.toFixed(2))
+  const precipitacion = Math.max(precipOWM, precipOM)
 
-  const impacto   = getImpacto(precipitacion)
+  const probabilidad = Math.round(openmeteo.probabilidad)
+  const impacto = getImpacto(precipitacion)
   const direccion = getDireccionViento(meteo.direccionViento)
 
   return NextResponse.json({
@@ -157,15 +170,15 @@ export async function GET(request: Request) {
     direccionTexto: direccion,
     presion: Math.round(meteo.presion),
     visibilidad: Math.round(meteo.visibilidad * 10) / 10,
-    // mm acumulados en la hora en curso — dato confiable para cosecha de caña
     precipitacion,
     probabilidad,
     uvIndex: openmeteo.uvIndex,
     impacto,
     fuentes: {
-      tomorrow:  tomorrow   ? 'ok' : 'error',
+      tomorrow: tomorrow ? 'ok' : 'error',
       openmeteo: 'ok',
       weatherapi: weatherapi ? 'ok' : 'error',
+      openweathermap: owm ? 'ok' : 'error',
     },
     timestamp: new Date().toISOString(),
   })
