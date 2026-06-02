@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useRef } from 'react'
 
 interface MapaProps {
@@ -16,10 +17,13 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
 
   useEffect(() => {
     if (!mapaRef.current || mapInstanceRef.current) return
+
     const iniciarMapa = async () => {
       const maplibregl = (await import('maplibre-gl')).default
       await import('maplibre-gl/dist/maplibre-gl.css')
+
       const owmKey = process.env.NEXT_PUBLIC_OWM_KEY || ''
+
       const map = new maplibregl.Map({
         container: mapaRef.current!,
         style: {
@@ -39,7 +43,7 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
       })
 
       map.on('load', () => {
-        // Capa de nubes
+        // Capa de nubes con opacidad muy baja — solo referencia visual, no tapa la precipitación
         map.addSource('nubes', {
           type: 'raster',
           tiles: [
@@ -52,11 +56,12 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
           id: 'nubes-layer',
           type: 'raster',
           source: 'nubes',
-          paint: { 'raster-opacity': 0.3 },
+          // Bajamos de 0.4 a 0.15 — referencia visual sin distorsionar colores de precipitación
+          paint: { 'raster-opacity': 0.15 },
         })
 
-        // Capa de RADAR (reemplaza precipitation_new)
-        map.addSource('radar', {
+        // Capa de precipitación encima — precipitation_new usa la paleta verde→amarillo→rojo
+        map.addSource('precipitacion', {
           type: 'raster',
           tiles: [
             `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${owmKey}`
@@ -65,9 +70,9 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
           attribution: '© OpenWeatherMap',
         })
         map.addLayer({
-          id: 'radar-layer',
+          id: 'precipitacion-layer',
           type: 'raster',
-          source: 'radar',
+          source: 'precipitacion',
           paint: { 'raster-opacity': 0.85 },
         })
 
@@ -88,6 +93,7 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
         markerRef.current = marker
       })
 
+      // Click para cambiar ubicación
       map.on('click', (e) => {
         const newLat = e.lngLat.lat
         const newLng = e.lngLat.lng
@@ -103,6 +109,7 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
     }
 
     iniciarMapa()
+
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove()
@@ -121,25 +128,74 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
     <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '500px' }}>
       <div ref={mapaRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* Leyenda radar estilo OpenWeatherMap */}
+      {/* Leyenda de intensidad de precipitación — igual a OpenWeatherMap */}
       <div style={{
-        position: 'absolute', bottom: '10px', left: '10px', zIndex: 10,
-        background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(8px)',
-        borderRadius: '10px', padding: '6px 12px',
-        border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-        display: 'flex', flexDirection: 'column', gap: '3px'
+        position: 'absolute',
+        bottom: '28px',
+        left: '12px',
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(6px)',
+        borderRadius: '10px',
+        padding: '10px 14px',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.18)',
+        zIndex: 10,
+        minWidth: '210px',
       }}>
-        <div style={{ fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8', marginBottom: '2px' }}>
-          RADAR mm/h
+        <div style={{ fontSize: '0.62rem', fontWeight: 700, color: '#374151', letterSpacing: '0.8px', marginBottom: '7px' }}>
+          INTENSIDAD DE PRECIPITACIÓN
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '0.65rem', color: '#64748b' }}>0</span>
-          <div style={{
-            width: '120px', height: '10px', borderRadius: '6px',
-            background: 'linear-gradient(to right, #a0d8f0, #4fc3f7, #00e676, #ffee58, #ff7043, #b71c1c)',
-          }} />
-          <span style={{ fontSize: '0.65rem', color: '#64748b' }}>40+</span>
+        {/* Barra de gradiente igual a la paleta precipitation_new de OWM */}
+        <div style={{
+          height: '10px',
+          borderRadius: '5px',
+          background: 'linear-gradient(to right, #a8e4ff, #59b4ff, #00d4aa, #00c800, #ffff00, #ff9600, #ff0000, #c80000)',
+          marginBottom: '5px',
+        }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>0 mm/h</span>
+          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>0.2</span>
+          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>1</span>
+          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>4</span>
+          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>10</span>
+          <span style={{ fontSize: '0.58rem', color: '#6b7280' }}>40+ mm/h</span>
         </div>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '7px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#59b4ff' }} />
+            <span style={{ fontSize: '0.6rem', color: '#374151' }}>Ligera</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffff00' }} />
+            <span style={{ fontSize: '0.6rem', color: '#374151' }}>Moderada</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ff0000' }} />
+            <span style={{ fontSize: '0.6rem', color: '#374151' }}>Intensa</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Badge "En vivo" */}
+      <div style={{
+        position: 'absolute',
+        top: '12px',
+        left: '12px',
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(6px)',
+        borderRadius: '8px',
+        padding: '6px 12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        zIndex: 10,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+      }}>
+        <div style={{
+          width: '8px', height: '8px', borderRadius: '50%', background: '#10b981',
+          boxShadow: '0 0 0 3px rgba(16,185,129,0.3)',
+        }} />
+        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#374151' }}>Precipitación en tiempo real</span>
+        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10b981' }}>En vivo</span>
       </div>
     </div>
   )
