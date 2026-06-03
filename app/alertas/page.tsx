@@ -53,7 +53,7 @@ export default function AlertasPage() {
 
   const { data: pronostico } = useSWR(
     `/api/pronostico?lat=${coords.lat}&lng=${coords.lng}`,
-    fetcher, { refreshInterval: 900000 }
+    fetcher, { refreshInterval: 300000 }
   )
 
   useEffect(() => {
