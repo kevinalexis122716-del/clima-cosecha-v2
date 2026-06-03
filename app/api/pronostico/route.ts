@@ -6,7 +6,7 @@ async function getHorarioOpenMeteo(lat: number, lng: number) {
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
       `&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m,relative_humidity_2m` +
       `&wind_speed_unit=kmh&timezone=America%2FBogota&forecast_days=3`,
-      { next: { revalidate: 300 } } // 5 minutos de caché
+      { next: { revalidate: 300 } }
     )
     if (!res.ok) return null
     const data = await res.json()
@@ -29,7 +29,13 @@ async function getHorarioOpenMeteo(lat: number, lng: number) {
         viento: Math.round(data.hourly.wind_speed_10m[idx] * 10) / 10,
       }
     })
-    return resultado
+
+    const fechaCache = res.headers.get('date')
+
+    return {
+      datos: resultado,
+      timestamp: fechaCache ? new Date(fechaCache).toISOString() : new Date().toISOString()
+    }
   } catch { return null }
 }
 
@@ -91,21 +97,21 @@ export async function GET(request: Request) {
   const lat = parseFloat(searchParams.get('lat') || '3.9044')
   const lng = parseFloat(searchParams.get('lng') || '-76.2960')
 
-  const [horario, diario, horarioPorDia] = await Promise.all([
+  const [horarioContainer, diario, horarioPorDia] = await Promise.all([
     getHorarioOpenMeteo(lat, lng),
     getDiarioOpenMeteo(lat, lng),
     getHorarioPorDia(lat, lng),
   ])
 
-  if (!horario) {
+  if (!horarioContainer) {
     return NextResponse.json({ error: 'Pronóstico no disponible temporalmente' }, { status: 500 })
   }
 
   return NextResponse.json({
-    horario: horario,
+    horario: horarioContainer.datos,
     diario: diario || [],
     horarioPorDia: horarioPorDia || {},
     fuentes: { openmeteo: 'ok', best_match: 'active' },
-    timestamp: new Date().toISOString(),
+    timestamp: horarioContainer.timestamp, // ← Sincronizado a la caché real del header
   })
 }
