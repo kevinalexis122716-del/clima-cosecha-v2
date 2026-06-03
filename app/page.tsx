@@ -164,23 +164,9 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col md:grid md:grid-cols-[1fr_300px] gap-[10px] flex-none md:flex-1 min-h-0 shrink-0 md:shrink">
+            
+            {/* CONTENEDOR DEL MAPA LIMPIO - SIN ETIQUETAS DUPLICADAS */}
             <div className="relative bg-white rounded-xl border border-slate-200 overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)] h-[250px] md:h-auto md:min-h-0">
-              <div className="absolute top-[10px] left-[10px] z-10 bg-white/90 backdrop-blur-md rounded-lg py-[5px] px-[12px] border border-slate-200 text-[0.72rem] text-slate-600 flex items-center gap-[8px] shadow-sm">
-                <span className="w-[7px] h-[7px] bg-emerald-500 rounded-full shadow-[0_0_5px_#10b981]" />
-                Mapa en tiempo real
-                <span className="bg-emerald-50 text-emerald-500 text-[0.62rem] font-bold px-[7px] py-[1px] rounded-full">En vivo</span>
-              </div>
-              <div className="absolute bottom-[10px] left-[10px] z-10 bg-white/90 backdrop-blur-md rounded-lg py-[6px] px-[12px] border border-slate-200 text-[0.68rem] text-slate-600 shadow-sm">
-                <div className="mb-[3px] font-bold text-[0.6rem] text-slate-400">INTENSIDAD</div>
-                <div className="flex gap-[10px] items-center">
-                  {([['#84cc16', 'Ligera'], ['#f59e0b', 'Moderada'], ['#ef4444', 'Intensa']] as [string, string][]).map(([color, label]) => (
-                    <span key={label} className="flex items-center gap-[4px]">
-                      <span className="w-[9px] h-[9px] rounded-sm" style={{ background: color }} />
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              </div>
               <Mapa lat={coords.lat} lng={coords.lng} onClickMapa={onClickMapa} />
             </div>
 
