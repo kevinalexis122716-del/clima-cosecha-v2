@@ -33,7 +33,7 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
               type: 'raster',
               tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
               tileSize: 256,
-              attribution: '© OpenStreetMap',
+              attribution: '© OpenStreetMap | Radar: OpenWeatherMap',
             },
           },
           layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
@@ -43,48 +43,40 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
       })
 
       map.on('load', () => {
-        // Capa de nubes con opacidad baja
-        map.addSource('nubes', {
-          type: 'raster',
-          tiles: [
-            `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${owmKey}`
-          ],
-          tileSize: 256,
-          attribution: '© OpenWeatherMap',
-        })
-        map.addLayer({
-          id: 'nubes-layer',
-          type: 'raster',
-          source: 'nubes',
-          paint: { 'raster-opacity': 0.15 },
-        })
+        // Capa 1: Nubes (opacidad 0.15 para que sea un detalle sutil)
+        if (owmKey) {
+          map.addSource('nubes', {
+            type: 'raster',
+            tiles: [`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${owmKey}`],
+            tileSize: 256,
+          })
+          map.addLayer({
+            id: 'nubes-layer',
+            type: 'raster',
+            source: 'nubes',
+            paint: { 'raster-opacity': 0.15 },
+          })
 
-        // Capa de precipitación API 2.0 (Capa PR0 estándar)
-        map.addSource('precipitacion', {
-          type: 'raster',
-          tiles: [
-            `https://maps.openweathermap.org/maps/2.0/weather/PR0/{z}/{x}/{y}?appid=${owmKey}`
-          ],
-          tileSize: 256,
-          attribution: '© OpenWeatherMap',
-        })
-        map.addLayer({
-          id: 'precipitacion-layer',
-          type: 'raster',
-          source: 'precipitacion',
-          paint: { 'raster-opacity': 0.85 },
-        })
+          // Capa 2: Precipitación gratuita (Tonos Azules -> Morados)
+          map.addSource('precipitacion', {
+            type: 'raster',
+            tiles: [`https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${owmKey}`],
+            tileSize: 256,
+          })
+          map.addLayer({
+            id: 'precipitacion-layer',
+            type: 'raster',
+            source: 'precipitacion',
+            paint: { 'raster-opacity': 0.85 },
+          })
+        }
 
-        // Marcador de ubicación
+        // Marcador interactivo
         const el = document.createElement('div')
         el.style.cssText = `
-          width: 18px;
-          height: 18px;
-          background: #2563eb;
-          border: 3px solid white;
-          border-radius: 50%;
-          box-shadow: 0 0 0 4px rgba(37,99,235,0.35), 0 2px 10px rgba(0,0,0,0.5);
-          cursor: pointer;
+          width: 18px; height: 18px; background: #2563eb;
+          border: 3px solid white; border-radius: 50%;
+          box-shadow: 0 0 0 4px rgba(37,99,235,0.35), 0 2px 10px rgba(0,0,0,0.5); cursor: pointer;
         `
         const marker = new maplibregl.Marker({ element: el })
           .setLngLat([lng, lat])
@@ -92,16 +84,11 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
         markerRef.current = marker
       })
 
-      // Click para cambiar ubicación
       map.on('click', (e) => {
         const newLat = e.lngLat.lat
         const newLng = e.lngLat.lng
-        if (markerRef.current) {
-          markerRef.current.setLngLat([newLng, newLat])
-        }
-        if (onClickMapa) {
-          onClickMapa(newLat, newLng)
-        }
+        if (markerRef.current) markerRef.current.setLngLat([newLng, newLat])
+        if (onClickMapa) onClickMapa(newLat, newLng)
       })
 
       mapInstanceRef.current = map
@@ -124,62 +111,31 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
   }, [lat, lng])
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '500px' }}>
-      <div ref={mapaRef} style={{ width: '100%', height: '100%' }} />
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '100%' }}>
+      {/* Contenedor principal del Mapa */}
+      <div ref={mapaRef} style={{ width: '100%', height: '100%', borderRadius: 'inherit' }} />
 
-      {/* LEYENDA IDÉNTICA A LA NATIVA DE OPENWEATHERMAP */}
-      <div style={{
-        position: 'absolute',
-        bottom: '24px',
-        right: '12px',
-        background: 'rgba(255,255,255,0.95)',
-        backdropFilter: 'blur(8px)',
-        borderRadius: '30px',
-        padding: '8px 16px',
-        boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
-        zIndex: 10,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-      }}>
-        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#f97316', display: 'flex', gap: '4px' }}>
-          Precipitación <span style={{ color: '#64748b', fontWeight: 600 }}>0 mm/h</span>
-        </div>
-        
-        <div style={{
-          width: '120px',
-          height: '6px',
-          borderRadius: '3px',
-          // Gradiente exacto de la documentación API 2.0 PR0
-          background: 'linear-gradient(to right, rgba(136,184,237,0.1), #88b8ed, #408ce0, #24c79f, #14a60f, #ebd01a, #e38612, #d9251c, #9c1752)',
-        }} />
-        
-        <div style={{ fontSize: '0.65rem', fontWeight: 600, color: '#64748b' }}>
-          40 mm/h
-        </div>
+      {/* Badge SUPERIOR IZQUIERDO: "En vivo" */}
+      <div className="absolute top-[10px] left-[10px] z-20 bg-white/90 backdrop-blur-md rounded-lg py-[5px] px-[12px] border border-slate-200 text-[0.72rem] text-slate-600 flex items-center gap-[8px] shadow-sm">
+        <span className="w-[7px] h-[7px] bg-emerald-500 rounded-full shadow-[0_0_5px_#10b981]" />
+        Precipitación <span className="hidden md:inline">en tiempo real</span>
+        <span className="bg-emerald-50 text-emerald-500 text-[0.62rem] font-bold px-[7px] py-[1px] rounded-full">En vivo</span>
       </div>
 
-      {/* Badge "En vivo" */}
-      <div style={{
-        position: 'absolute',
-        top: '12px',
-        left: '12px',
-        background: 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(6px)',
-        borderRadius: '8px',
-        padding: '6px 12px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        zIndex: 10,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-      }}>
-        <div style={{
-          width: '8px', height: '8px', borderRadius: '50%', background: '#10b981',
-          boxShadow: '0 0 0 3px rgba(16,185,129,0.3)',
+      {/* LEYENDA INFERIOR DERECHA: Personalizada (Azul -> Morado) */}
+      <div className="absolute bottom-[10px] right-[10px] md:bottom-[14px] md:right-[14px] z-20 bg-white/95 backdrop-blur-md rounded-full py-[8px] px-[12px] md:px-[16px] border border-slate-200 shadow-[0_4px_15px_rgba(0,0,0,0.08)] flex items-center gap-[8px] md:gap-[10px]">
+        <div className="text-[0.6rem] md:text-[0.65rem] font-bold text-blue-500 flex gap-[4px]">
+          Precipitación <span className="text-slate-500 font-semibold hidden md:inline">Ligera</span>
+        </div>
+        
+        {/* El Gradiente Mágico que coincide con la API Gratuita */}
+        <div className="w-[80px] md:w-[120px] h-[6px] rounded-full" style={{
+          background: 'linear-gradient(to right, rgba(167, 192, 255, 0.4), #8ca5ff, #4a6ee0, #5e35b1, #311b92)'
         }} />
-        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#374151' }}>Precipitación en tiempo real</span>
-        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#10b981' }}>En vivo</span>
+        
+        <div className="text-[0.6rem] md:text-[0.65rem] font-semibold text-slate-500">
+          Intensa
+        </div>
       </div>
     </div>
   )
