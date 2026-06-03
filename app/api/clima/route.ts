@@ -31,12 +31,12 @@ const getOpenMeteo = async (lat: number, lng: number) => {
           probabilidad: c.precipitation_probability ?? 0,
           uvIndex: c.uv_index ?? null,
           fuente: 'openmeteo',
-          timestamp: new Date().toISOString() // ← Queda congelado por 5 min
+          timestamp: new Date().toISOString()
         }
       } catch { return null }
     },
     [`openmeteo-${lat}-${lng}`],
-    { revalidate: 300 } // 300s = 5 minutos exactos
+    { revalidate: 300 }
   )()
 }
 
@@ -59,8 +59,12 @@ const getTomorrow = async (lat: number, lng: number) => {
           direccionViento: v.windDirection,
           presion: v.pressureSurfaceLevel,
           visibilidad: v.visibility,
-          precipitacion: v.precipitationIntensity ?? 0, // ← Corregido (Punto 3)
-          probabilidad: v.precipitationProbability ?? 0,
+          // ✅ CAMBIO 1: precipitationIntensity es mm/h — ideal para tiempo real
+          precipitacion: v.precipitationIntensity ?? 0,
+          // ✅ CAMBIO 2: Si hay intensidad de lluvia, forzar probabilidad a 100%
+          probabilidad: v.precipitationProbability ?? (v.precipitationIntensity > 0 ? 100 : 0),
+          // ✅ CAMBIO 3: Añadir uvIndex para que el response final no quede undefined
+          uvIndex: v.uvIndex ?? null,
           fuente: 'tomorrow',
           timestamp: new Date().toISOString()
         }
@@ -90,8 +94,10 @@ const getWeatherApi = async (lat: number, lng: number) => {
           direccionViento: c.wind_degree,
           presion: c.pressure_mb,
           visibilidad: c.vis_km,
-          precipitacion: c.precip_mm ?? 0, // ← Corregido (Punto 3)
-          probabilidad: 0, 
+          precipitacion: c.precip_mm ?? 0,
+          probabilidad: c.precip_mm > 0 ? 100 : 0,
+          // ✅ CAMBIO 3 (también aquí): uvIndex para consistencia
+          uvIndex: c.uv ?? null,
           fuente: 'weatherapi',
           timestamp: new Date().toISOString()
         }
@@ -121,53 +127,46 @@ export async function GET(request: Request) {
   const lat = parseFloat(searchParams.get('lat') || '3.9044')
   const lng = parseFloat(searchParams.get('lng') || '-76.2960')
 
-  const [openmeteo, tomorrow, weatherapi] = await Promise.all([
-    getOpenMeteo(lat, lng),
+  // Disparamos las 3 APIs en paralelo — sin perder tiempo
+  const [tomorrow, openmeteo, weatherapi] = await Promise.all([
     getTomorrow(lat, lng),
+    getOpenMeteo(lat, lng),
     getWeatherApi(lat, lng),
   ])
 
-  if (!openmeteo) {
-    const backup = tomorrow || weatherapi
-    if (!backup) {
-      return NextResponse.json({ error: 'Servicios meteorológicos no disponibles temporalmente' }, { status: 500 })
-    }
-    return NextResponse.json({
-      temp: Math.round(backup.temp * 10) / 10,
-      sensacion: Math.round(backup.sensacion * 10) / 10,
-      humedad: Math.round(backup.humedad),
-      viento: Math.round(backup.viento * 10) / 10,
-      direccionViento: Math.round(backup.direccionViento),
-      direccionTexto: getDireccionViento(backup.direccionViento),
-      presion: Math.round(backup.presion),
-      visibilidad: Math.round(backup.visibilidad * 10) / 10,
-      precipitacion: backup.precipitacion,
-      probabilidad: backup.probabilidad,
-      impacto: getImpacto(backup.precipitacion),
-      advertencia: 'Datos numéricos de telemetría de respaldo',
-      timestamp: backup.timestamp,
-    })
+  // ✅ CAMBIO 4 (el principal): Tomorrow.io es el REY del tiempo real.
+  // Si falla → OpenMeteo. Si falla → WeatherAPI.
+  const dataPrincipal = tomorrow || openmeteo || weatherapi
+
+  if (!dataPrincipal) {
+    return NextResponse.json({ error: 'Servicios meteorológicos no disponibles temporalmente' }, { status: 500 })
   }
 
-  const precipitacion = parseFloat(openmeteo.precipitacion.toFixed(2))
-  const probabilidad = Math.round(openmeteo.probabilidad)
+  const precipitacion = parseFloat(dataPrincipal.precipitacion.toFixed(2))
+  const probabilidad = Math.round(dataPrincipal.probabilidad)
   const impacto = getImpacto(precipitacion)
-  const direccionText = getDireccionViento(openmeteo.direccionViento)
+  const direccionText = getDireccionViento(dataPrincipal.direccionViento)
 
   return NextResponse.json({
-    temp: Math.round(openmeteo.temp * 10) / 10,
-    sensacion: Math.round(openmeteo.sensacion * 10) / 10,
-    humedad: Math.round(openmeteo.humedad),
-    viento: Math.round(openmeteo.viento * 10) / 10,
-    direccionViento: Math.round(openmeteo.direccionViento),
+    temp: Math.round(dataPrincipal.temp * 10) / 10,
+    sensacion: Math.round(dataPrincipal.sensacion * 10) / 10,
+    humedad: Math.round(dataPrincipal.humedad),
+    viento: Math.round(dataPrincipal.viento * 10) / 10,
+    direccionViento: Math.round(dataPrincipal.direccionViento),
     direccionTexto: direccionText,
-    presion: Math.round(openmeteo.presion),
-    visibilidad: Math.round(openmeteo.visibilidad * 10) / 10,
+    presion: Math.round(dataPrincipal.presion),
+    visibilidad: Math.round(dataPrincipal.visibilidad * 10) / 10,
     precipitacion,
     probabilidad,
-    uvIndex: openmeteo.uvIndex,
+    uvIndex: dataPrincipal.uvIndex,
     impacto,
-    fuentes: { openmeteo: 'ok', tomorrow: tomorrow ? 'ok' : 'offline', weatherapi: weatherapi ? 'ok' : 'offline' },
-    timestamp: openmeteo.timestamp,
+    // 🔍 Útil para debug: te dice cuál fuente está activa en cada momento
+    fuentes: {
+      activa: dataPrincipal.fuente,
+      tomorrow: tomorrow ? 'ok' : 'offline',
+      openmeteo: openmeteo ? 'ok' : 'offline',
+      weatherapi: weatherapi ? 'ok' : 'offline'
+    },
+    timestamp: dataPrincipal.timestamp,
   })
 }
