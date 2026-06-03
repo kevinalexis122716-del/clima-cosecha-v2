@@ -10,12 +10,15 @@ async function getOpenMeteo(lat: number, lng: number) {
       `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,` +
       `wind_speed_10m,wind_direction_10m,surface_pressure,visibility,precipitation_probability,uv_index` +
       `&wind_speed_unit=kmh&timezone=America%2FBogota`,
-      { next: { revalidate: 300 } } // ← 5 minutos de caché en servidor (300 segundos)
+      { next: { revalidate: 300 } }
     )
     if (!res.ok) return null
     const data = await res.json()
     const c = data.current
     if (!c) return null
+
+    // Extraemos la fecha exacta en la que el servidor de Open-Meteo generó o entregó el caché
+    const fechaCache = res.headers.get('date')
 
     return {
       temp: c.temperature_2m,
@@ -29,6 +32,7 @@ async function getOpenMeteo(lat: number, lng: number) {
       probabilidad: c.precipitation_probability ?? 0,
       uvIndex: c.uv_index ?? null,
       fuente: 'openmeteo',
+      timestamp: fechaCache ? new Date(fechaCache).toISOString() : new Date().toISOString()
     }
   } catch { return null }
 }
@@ -38,11 +42,13 @@ async function getTomorrow(lat: number, lng: number) {
     if (!TOMORROW_KEY) return null
     const res = await fetch(
       `https://api.tomorrow.io/v4/weather/realtime?location=${lat},${lng}&apikey=${TOMORROW_KEY}&units=metric`,
-      { next: { revalidate: 300 } } // ← Sincronizado a 5 minutos
+      { next: { revalidate: 300 } }
     )
     if (!res.ok) return null
     const data = await res.json()
     const v = data.data.values
+    const fechaCache = res.headers.get('date')
+
     return {
       temp: v.temperature,
       sensacion: v.temperatureApparent,
@@ -52,6 +58,7 @@ async function getTomorrow(lat: number, lng: number) {
       presion: v.pressureSurfaceLevel,
       visibilidad: v.visibility,
       fuente: 'tomorrow',
+      timestamp: fechaCache ? new Date(fechaCache).toISOString() : new Date().toISOString()
     }
   } catch { return null }
 }
@@ -61,11 +68,13 @@ async function getWeatherApi(lat: number, lng: number) {
     if (!WEATHERAPI_KEY) return null
     const res = await fetch(
       `https://api.weatherapi.com/v1/current.json?key=${WEATHERAPI_KEY}&q=${lat},${lng}&aqi=no`,
-      { next: { revalidate: 300 } } // ← Sincronizado a 5 minutos
+      { next: { revalidate: 300 } }
     )
     if (!res.ok) return null
     const data = await res.json()
     const c = data.current
+    const fechaCache = res.headers.get('date')
+
     return {
       temp: c.temp_c,
       sensacion: c.feelslike_c,
@@ -75,6 +84,7 @@ async function getWeatherApi(lat: number, lng: number) {
       presion: c.pressure_mb,
       visibilidad: c.vis_km,
       fuente: 'weatherapi',
+      timestamp: fechaCache ? new Date(fechaCache).toISOString() : new Date().toISOString()
     }
   } catch { return null }
 }
@@ -122,7 +132,7 @@ export async function GET(request: Request) {
       probabilidad: 0,
       impacto: getImpacto(0),
       advertencia: 'Datos numéricos de telemetría de respaldo',
-      timestamp: new Date().toISOString(),
+      timestamp: backup.timestamp, // ← Usamos el timestamp real de la caché del backup
     })
   }
 
@@ -145,6 +155,6 @@ export async function GET(request: Request) {
     uvIndex: openmeteo.uvIndex,
     impacto,
     fuentes: { openmeteo: 'ok', tomorrow: tomorrow ? 'ok' : 'offline', weatherapi: weatherapi ? 'ok' : 'offline' },
-    timestamp: new Date().toISOString(),
+    timestamp: openmeteo.timestamp, // ← Usamos el timestamp real de la caché de OpenMeteo
   })
 }
