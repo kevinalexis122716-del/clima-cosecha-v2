@@ -38,12 +38,12 @@ export default function Sidebar({ alertasCount, onToggle, ultimaActualizacion, c
   }
 
   return (
-    <div style={{ width: collapsed ? '70px' : '240px', background: 'white', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', height: '100vh', transition: 'width 0.2s ease', shrink: 0 }} className="hidden md:flex">
+    <div style={{ width: collapsed ? '70px' : '240px', background: 'white', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', height: '100vh', transition: 'width 0.2s ease', flexShrink: 0 }} className="hidden md:flex">
       <div style={{ padding: '18px 16px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #e2e8f0', cursor: 'pointer' }} onClick={toggleSidebar}>
         <Image src="/iconos/probabilidad.png" alt="logo" width={28} height={28} />
         {!collapsed && (
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', lineHeight: 'tight' }}>Clima Cosecha</div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', lineHeight: 1.2 }}>Clima Cosecha</div>
             <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Monitoreo agroclimático</div>
           </div>
         )}
@@ -75,7 +75,6 @@ export default function Sidebar({ alertasCount, onToggle, ultimaActualizacion, c
             <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0f172a' }}>Kevin Sanchez</div>
             <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginBottom: '6px' }}>Desarrollador</div>
             
-            {/* PASTILLA REACTIVA: Alerta naranja si supera los 6 minutos (datos viejos) */}
             <div style={{ 
               display: 'flex', alignItems: 'center', gap: '6px', 
               background: minutos >= 6 ? '#fff7ed' : '#f0fdf4', 
