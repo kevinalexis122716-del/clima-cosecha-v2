@@ -40,6 +40,7 @@ function getHoraActual() {
   }).toUpperCase()
 }
 
+// Icono meteorológico dinámico según precipitación y probabilidad
 function getIconoCondicion(mm: number, prob: number) {
   if (mm > 5) return '⛈️'
   if (mm > 0.5) return '🌧️'
@@ -60,14 +61,15 @@ export default function Home() {
     if (savedLugar) setLugar(savedLugar)
   }, [])
 
+  // SWR configurado a 300000ms (5 minutos exactos de intervalo de refresco)
   const { data: clima, isLoading: loadingClima } = useSWR(
     `/api/clima?lat=${coords.lat}&lng=${coords.lng}`,
-    fetcher, { refreshInterval: 900000 }
+    fetcher, { refreshInterval: 300000 }
   )
 
   const { data: pronostico, isLoading: loadingPron } = useSWR(
     `/api/pronostico?lat=${coords.lat}&lng=${coords.lng}`,
-    fetcher, { refreshInterval: 900000 }
+    fetcher, { refreshInterval: 300000 }
   )
 
   const onClickMapa = useCallback(async (lat: number, lng: number) => {
@@ -93,7 +95,6 @@ export default function Home() {
   }, [])
 
   const horario: Record<string, number | string>[] = Array.isArray(pronostico?.horario) ? pronostico.horario : []
-  
   const alertasCount = horario.filter((h) => Number(h.precipitacion) > 5).length
 
   const kpis = [
@@ -117,7 +118,6 @@ export default function Home() {
       />
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-
         <div className="flex md:hidden items-center justify-start bg-white px-4 py-3 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2">
             <Image src="/iconos/probabilidad.png" alt="logo" width={28} height={28} style={{ objectFit: 'contain', flexShrink: 0 }} />
@@ -132,9 +132,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <MapPin size={15} color="#2563eb" />
             <span className="font-semibold text-blue-600 text-[0.88rem]">{lugar}</span>
-            <span className="text-slate-400 text-[0.75rem] hidden md:block">
-              {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
-            </span>
+            <span className="text-slate-400 text-[0.75rem] hidden md:block">{coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}</span>
           </div>
           <div className="flex flex-col md:flex-row items-end md:items-center gap-1 md:gap-[20px]">
             <div className="flex items-center gap-[6px] text-slate-500 text-[0.75rem] md:text-[0.82rem]">
@@ -149,7 +147,6 @@ export default function Home() {
         </div>
 
         <div className="flex-1 p-3 md:p-4 flex flex-col gap-[10px] overflow-y-auto md:overflow-hidden pb-[90px] md:pb-4">
-
           <div className="grid grid-cols-2 md:grid-cols-6 gap-[10px] shrink-0">
             {kpis.map((kpi, i) => (
               <div key={i} className="bg-white rounded-xl p-[10px] md:p-[10px_14px] border border-slate-200 flex items-center gap-2 md:gap-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
@@ -164,8 +161,7 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col md:grid md:grid-cols-[1fr_300px] gap-[10px] flex-none md:flex-1 min-h-0 shrink-0 md:shrink">
-            
-            {/* CONTENEDOR DEL MAPA LIMPIO - SIN ETIQUETAS DUPLICADAS */}
+            {/* Contenedor del mapa optimizado */}
             <div className="relative bg-white rounded-xl border border-slate-200 overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)] h-[250px] md:h-auto md:min-h-0">
               <Mapa lat={coords.lat} lng={coords.lng} onClickMapa={onClickMapa} />
             </div>
@@ -206,7 +202,6 @@ export default function Home() {
               </div>
             )}
           </div>
-
         </div>
       </div>
     </div>
