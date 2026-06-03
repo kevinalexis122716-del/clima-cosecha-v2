@@ -68,30 +68,7 @@ function getClasificacion(horas: HoraData[], mmTotal: number, prob: number): { l
   return { label: 'Seco', icono: '☀️' }
 }
 
-function getDescripcionDia(mm: number, prob: number, tempMax: number, tempMin: number, humedad: number, labelCondicion: string): string {
-  let desc = `Se esperan condiciones de ${labelCondicion.toLowerCase()}`
-  if (mm > 2) {
-    desc += ` con ${mm.toFixed(1)} mm de lluvia acumulada total en el día`
-    if (prob > 70) desc += ` y alta probabilidad de precipitación`
-  } else if (prob > 50) {
-    desc += ` con posibilidad de lluvia leve`
-  } else {
-    desc += ` y tiempo estable`
-  }
-  if (tempMax - tempMin > 8) {
-    desc += `. Temperaturas variables entre ${tempMin}°C y ${tempMax}°C`
-  } else {
-    desc += `. Temperaturas entre ${tempMin}°C y ${tempMax}°C`
-  }
-  if (humedad > 85) desc += `. Humedad muy alta`
-  else if (humedad > 70) desc += `. Humedad alta`
-  else if (humedad > 50) desc += `. Humedad media`
-  else desc += `. Humedad baja`
-
-  desc += '.'
-  return desc
-}
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function generarResumenTecnico(dia: DiaData, horas: HoraData[], clase: { label: string }, tecnico: any) {
   const max1h = horas?.length ? Math.max(...horas.map(h => h.precipitacion)) : 0
   let resumen = `Para la jornada se prevé un escenario meteorológico catalogado como ${clase.label.toLowerCase()}. `
@@ -113,13 +90,6 @@ function generarResumenTecnico(dia: DiaData, horas: HoraData[], clase: { label: 
   }
   
   resumen += `\n\nTérmicamente, la amplitud será de ${(dia.tempMax - dia.tempMin).toFixed(1)}°C (mínima de ${dia.tempMin}°C, máxima de ${dia.tempMax}°C). `
-  
-  let nivelHumedad = ''
-  if (dia.humedad > 85 || (tecnico?.horasHR90 && tecnico.horasHR90 > 4)) nivelHumedad = 'niveles muy altos'
-  else if (dia.humedad > 70) nivelHumedad = 'niveles altos'
-  else if (dia.humedad > 50) nivelHumedad = 'niveles medios'
-  else nivelHumedad = 'niveles bajos'
-
   resumen += `La humedad relativa promediará un ${dia.humedad}%.`
   return resumen
 }
@@ -140,12 +110,33 @@ function calcularEventos(horas: HoraData[]) {
   return { tempMax, tempMin, horaMax, horaMin, inicioLluvia, finLluvia, picoPrecip }
 }
 
-function calcularDetallesTecnicos(horas: HoraData[], tempMax: number, tempMin: number) {
+// NUEVO: Fórmula oficial FAO para Radiación Extraterrestre (Ra) dinámica
+function calcularRa(lat: number, fechaIso: string): number {
+  const latRad = (lat * Math.PI) / 180
+  const fecha = new Date(fechaIso + 'T12:00:00') // Forzamos mediodía para evitar saltos de zona horaria
+  const inicioAno = new Date(fecha.getFullYear(), 0, 0)
+  const J = Math.floor((fecha.getTime() - inicioAno.getTime()) / 86400000) // Día Juliano (1-365)
+  
+  const delta = 0.409 * Math.sin(((2 * Math.PI) / 365) * J - 1.39) // Declinación solar
+  const dr = 1 + 0.033 * Math.cos(((2 * Math.PI) / 365) * J) // Distancia relativa tierra-sol
+  const ws = Math.acos(-Math.tan(latRad) * Math.tan(delta)) // Ángulo de hora de puesta de sol
+  
+  // Ra en Megajulios por metro cuadrado por día
+  const Ra_MJ = (24 * 60 / Math.PI) * 0.082 * dr * (ws * Math.sin(latRad) * Math.sin(delta) + Math.cos(latRad) * Math.cos(delta) * Math.sin(ws))
+  
+  return Ra_MJ / 2.45 // Convertimos a mm/día equivalente (dividiendo por calor latente de vaporización)
+}
+
+function calcularDetallesTecnicos(horas: HoraData[], tempMax: number, tempMin: number, fecha: string, lat: number) {
   if (!horas || horas.length === 0) return null
   const amplitud = parseFloat((tempMax - tempMin).toFixed(1))
   const humedadMedia = Math.round(horas.reduce((s, h) => s + h.humedad, 0) / horas.length)
   const horasHR90 = horas.filter(h => h.humedad > 90).length
-  const evapotranspiracion = parseFloat((0.0023 * (tempMax - tempMin) ** 0.5 * ((tempMax + tempMin) / 2 + 17.8) * 24).toFixed(1))
+  
+  // Usamos el cálculo real trigonométrico para esa coordenada y fecha exacta
+  const Ra = calcularRa(lat, fecha)
+  const evapotranspiracion = parseFloat((0.0023 * (tempMax - tempMin) ** 0.5 * ((tempMax + tempMin) / 2 + 17.8) * Ra).toFixed(1))
+  
   const radiacion = horas.some(h => h.precipitacion > 2) ? 420 : horas.some(h => h.probabilidad > 60) ? 620 : 820
   const rocioPromedio = calcularPuntoRocio((tempMax + tempMin) / 2, humedadMedia)
   const horasConPresion = horas.filter(h => h.presion && h.presion > 0)
@@ -224,7 +215,6 @@ export default function Pronosticos() {
   const [isMobile, setIsMobile] = useState(false)
   const [fechaHoraActual, setFechaHoraActual] = useState({ fecha: '', hora: '' })
   
-  // NUEVO: Control de flujos de pantalla para móvil (Imagen 1 vs Imagen 2)
   const [vistaMovil, setVistaMovil] = useState<'lista' | 'detalle'>('lista')
 
   useEffect(() => {
@@ -262,7 +252,7 @@ export default function Pronosticos() {
 
   const { data: pronostico } = useSWR(
     `/api/pronostico?lat=${coords.lat}&lng=${coords.lng}`,
-    fetcher, { refreshInterval: 900000 }
+    fetcher, { refreshInterval: 300000 }
   )
 
   const horarioPlano: HoraData[] = Array.isArray(pronostico?.horario) ? pronostico.horario : []
@@ -272,7 +262,10 @@ export default function Pronosticos() {
   const horasDia: HoraData[] = diaActual ? (horarioPorDia[diaActual.fecha] || []) : []
   const condicion = diaActual ? getClasificacion(horasDia, diaActual.precipitacion, diaActual.probabilidad) : null
   const eventos = calcularEventos(horasDia)
-  const tecnico = diaActual && eventos ? calcularDetallesTecnicos(horasDia, diaActual.tempMax, diaActual.tempMin) : null
+  
+  // Pasamos la fecha y las coordenadas para que calcule exacto
+  const tecnico = diaActual && eventos ? calcularDetallesTecnicos(horasDia, diaActual.tempMax, diaActual.tempMin, diaActual.fecha, coords.lat) : null
+  
   const alertasCount = horarioPlano.filter(h => h.precipitacion > 0.5).length
 
   const tabsGrafica = [
@@ -282,11 +275,9 @@ export default function Pronosticos() {
     { id: 'viento' as const, label: 'Viento', icono: '💨' },
   ]
 
-  // ── RENDER MÓVIL VISTA 1: LISTA DE TARJETAS (Imagen 1) ───────────────────
   if (isMobile && vistaMovil === 'lista') {
     return (
       <div className="flex flex-col h-screen overflow-hidden bg-slate-50 font-sans">
-        {/* TOPBAR MÓVIL ESTÁNDAR */}
         <div className="flex items-center justify-between bg-white px-4 py-3 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2">
             <Image src="/iconos/probabilidad.png" alt="logo" width={28} height={28} style={{ objectFit: 'contain' }} />
@@ -297,7 +288,6 @@ export default function Pronosticos() {
           </div>
         </div>
 
-        {/* UBICACIÓN Y HORARIO EN VIVO */}
         <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-1.5 text-blue-600 font-semibold text-[0.88rem]">
             <MapPin size={15} />
@@ -310,7 +300,6 @@ export default function Pronosticos() {
           </div>
         </div>
 
-        {/* LISTADO DE PRONÓSTICOS */}
         <div className="flex-1 overflow-y-auto p-4 pb-[100px] flex flex-col gap-3">
           <div>
             <h1 className="text-[1.25rem] font-extrabold text-slate-900 leading-none">Pronóstico 5 días</h1>
@@ -327,7 +316,6 @@ export default function Pronosticos() {
                 <div key={dia.fecha} onClick={() => { setDiaSeleccionado(i); setVistaMovil('detalle') }}
                   className="bg-white border border-slate-200 rounded-[14px] p-4 flex flex-col gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.03)] active:scale-[0.99] transition-all">
                   <div className="flex items-center justify-between">
-                    {/* Bloque Fecha */}
                     <div className="w-[85px] shrink-0">
                       <div className="text-[0.82rem] font-bold text-blue-600 capitalize leading-tight">
                         {esHoy(dia.fecha) ? formatFecha(dia.fecha, true).split('.')[0] : formatFecha(dia.fecha, true).split('.')[0]}
@@ -336,7 +324,6 @@ export default function Pronosticos() {
                         {esHoy(dia.fecha) ? 'Hoy' : formatFecha(dia.fecha, true).split(',')[0]}
                       </div>
                     </div>
-                    {/* Icono + Estado */}
                     <div className="flex-1 flex items-center gap-3 px-2 min-w-0">
                       <span className="text-3xl shrink-0">{cond.icono}</span>
                       <div className="min-w-0">
@@ -348,12 +335,10 @@ export default function Pronosticos() {
                         </div>
                       </div>
                     </div>
-                    {/* Botón flecha */}
                     <div className="w-[30px] h-[30px] rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
                       <ChevronRight size={16} />
                     </div>
                   </div>
-                  {/* Fila de Métricas Inferiores */}
                   <div className="flex justify-between items-center border-t border-slate-100 pt-2.5 mt-0.5 text-[0.72rem] text-slate-500 font-medium px-1">
                     <span className="flex items-center gap-1">💧 {dia.probabilidad}%</span>
                     <span className="flex items-center gap-1">🌧️ {dia.precipitacion} mm</span>
@@ -364,7 +349,6 @@ export default function Pronosticos() {
             })
           )}
 
-          {/* CUADRO INFORMATIVO DE SELECCIÓN */}
           <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 flex items-start gap-2.5 mt-2">
             <span className="text-blue-500 text-[1.1rem] mt-0.5">ℹ️</span>
             <div>
@@ -378,11 +362,9 @@ export default function Pronosticos() {
     )
   }
 
-  // ── RENDER MÓVIL VISTA 2: DETALLE AVANZADO (Imagen 2) ───────────────────
   if (isMobile && vistaMovil === 'detalle' && diaActual && condicion) {
     return (
       <div className="flex flex-col h-screen overflow-hidden bg-slate-50 font-sans">
-        {/* TOPBAR MÓVIL DETALLE CON BOTÓN ATRÁS */}
         <div className="flex items-center justify-between bg-white px-4 py-3 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-2">
             <button onClick={() => setVistaMovil('lista')} className="w-8 h-8 -ml-1 rounded-full bg-slate-50 flex items-center justify-center text-slate-700 active:bg-slate-100">
@@ -402,7 +384,6 @@ export default function Pronosticos() {
           </div>
         </div>
 
-        {/* UBICACIÓN Y HORARIO EN VIVO */}
         <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-1.5 text-blue-600 font-semibold text-[0.88rem]">
             <MapPin size={15} />
@@ -415,10 +396,7 @@ export default function Pronosticos() {
           </div>
         </div>
 
-        {/* CONTENIDO TÉCNICO DETALLADO */}
         <div className="flex-1 overflow-y-auto p-4 pb-[100px] flex flex-col gap-4">
-          
-          {/* CABECERA RESUMEN DEL DÍA SELECCIONADO */}
           <div className="bg-white border border-slate-200 rounded-[14px] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
               <span className="text-[0.85rem] font-extrabold text-slate-900 capitalize">
@@ -440,7 +418,6 @@ export default function Pronosticos() {
               </div>
             </div>
 
-            {/* TABLA DE 4 COLUMNAS TÉCNICAS */}
             <div className="grid grid-cols-4 gap-1 text-center border-t border-slate-100 pt-3 mt-4 text-[0.68rem]">
               <div className="border-r border-slate-100">
                 <div className="text-slate-400 font-medium">Prob. lluvia</div>
@@ -461,7 +438,6 @@ export default function Pronosticos() {
             </div>
           </div>
 
-          {/* TABS DE LA GRÁFICA */}
           <div className="flex gap-1.5 overflow-x-auto pb-0.5 shrink-0">
             {tabsGrafica.map(tab => (
               <button key={tab.id} onClick={() => setTabGrafica(tab.id)}
@@ -474,7 +450,6 @@ export default function Pronosticos() {
             ))}
           </div>
 
-          {/* CONTENEDOR SVG CON HORIZONTAL SCROLL FORZADO */}
           <div className="bg-white border border-slate-200 rounded-[14px] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
             <div className="w-full overflow-x-auto pb-1 scrollbar-none">
               <div className="w-[850px]">
@@ -492,7 +467,6 @@ export default function Pronosticos() {
             )}
           </div>
 
-          {/* CUADROS DETALLES INFERIORES */}
           <div className="bg-white border border-slate-200 rounded-[14px] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
             <div className="flex items-center gap-2 text-[0.82rem] font-bold text-slate-900 border-b border-slate-100 pb-2 mb-2.5">
               <span>📋</span>
@@ -536,7 +510,6 @@ export default function Pronosticos() {
             )}
           </div>
 
-          {/* MATRIZ TÉCNICA 3 COLUMNAS COMPLETA (Imagen 2) */}
           <div className="bg-white border border-slate-200 rounded-[14px] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
             <div className="flex items-center gap-2 text-[0.82rem] font-bold text-slate-900 border-b border-slate-100 pb-2.5 mb-4">
               <span>📊</span>
@@ -560,8 +533,8 @@ export default function Pronosticos() {
                 <div className="font-extrabold text-slate-900 mt-0.5">{tecnico?.radiacion ?? '--'} W/m²</div>
               </div>
               <div>
-                <div className="text-slate-400 font-medium">Punto de rocío promedio</div>
-                <div className="font-extrabold text-slate-900 mt-0.5">{tecnico?.rocioPromedio ?? '--'} °C</div>
+                <div className="text-slate-400 font-medium">Evapotranspiración</div>
+                <div className="font-extrabold text-slate-900 mt-0.5">{tecnico?.evapotranspiracion ?? '--'} mm/día</div>
               </div>
               <div className="col-span-3 border-t border-slate-100 pt-2 text-center">
                 <div className="text-slate-400 font-medium">Presión atmosférica</div>
@@ -575,7 +548,6 @@ export default function Pronosticos() {
     )
   }
 
-  // ── RENDER COMPRENSIVO PARA ESCRITORIO (PC / TAB) ───────────────────────
   return (
     <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-slate-50 font-sans">
       <Sidebar alertasCount={alertasCount} onToggle={setSidebarCollapsed} ultimaActualizacion={pronostico?.timestamp} coords={coords} lugar={lugar} />
@@ -629,7 +601,6 @@ export default function Pronosticos() {
             <div>
               <h2 className="text-[1.1rem] font-bold text-slate-900 mb-4">Detalle del pronóstico</h2>
               <div className="grid grid-cols-[290px_1fr] gap-4 mb-4">
-                {/* INFO GENERAL */}
                 <div className="bg-white rounded-xl p-[18px] border border-slate-200 shadow-sm">
                   <div className="text-[0.7rem] font-bold text-slate-400 tracking-wider mb-4">INFORMACIÓN GENERAL DEL DÍA</div>
                   <div className="flex flex-col gap-3">
@@ -650,7 +621,6 @@ export default function Pronosticos() {
                   </div>
                 </div>
 
-                {/* GRÁFICA */}
                 <div className="bg-white rounded-xl p-[18px] border border-slate-200 shadow-sm">
                   <div className="text-[0.78rem] font-bold text-slate-900 mb-3">{formatFecha(diaActual.fecha)}</div>
                   <div className="flex gap-1.5 mb-4">
@@ -667,7 +637,6 @@ export default function Pronosticos() {
                 </div>
               </div>
 
-              {/* PANELES INFERIORES DESKTOP */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-white rounded-xl p-[18px] border border-slate-200 shadow-sm">
                   <div className="flex items-center gap-2 text-[0.82rem] font-bold text-slate-900 border-b border-slate-100 pb-2 mb-2.5">📋 Resumen agronómico del día</div>
@@ -707,7 +676,7 @@ export default function Pronosticos() {
                     <div className="grid grid-cols-3 gap-y-3 gap-x-1.5 text-center text-[0.68rem]">
                       <div><div className="text-slate-400 font-medium">Amp. térmica</div><div className="font-bold mt-0.5">{tecnico.amplitud} °C</div></div>
                       <div><div className="text-slate-400 font-medium">HR Media</div><div className="font-bold mt-0.5">{tecnico.humedadMedia} %</div></div>
-                      <div><div className="text-slate-400 font-medium">HR &gt; 90%</div><div className="font-bold mt-0.5">{tecnico.horasHR90} h</div></div>
+                      <div><div className="text-slate-400 font-medium">Evapotranspiración</div><div className="font-bold mt-0.5">{tecnico.evapotranspiracion} mm/día</div></div>
                       <div><div className="text-slate-400 font-medium">Radiación Máx</div><div className="font-bold mt-0.5">{tecnico.radiacion} W/m²</div></div>
                       <div><div className="text-slate-400 font-medium">Punto Rocío</div><div className="font-bold mt-0.5">{tecnico.rocioPromedio} °C</div></div>
                       <div className="col-span-3 text-center border-t border-slate-100 pt-2"><div className="text-slate-400 font-medium">Presión atmosférica</div><div className="font-bold mt-0.5">{tecnico.presion ?? '--'} hPa</div></div>
