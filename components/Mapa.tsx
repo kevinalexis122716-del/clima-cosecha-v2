@@ -43,8 +43,8 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
       })
 
       map.on('load', () => {
-        // Capa 1: Nubes (opacidad 0.15 para que sea un detalle sutil)
         if (owmKey) {
+          // Capa sutil de nubes
           map.addSource('nubes', {
             type: 'raster',
             tiles: [`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${owmKey}`],
@@ -57,7 +57,7 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
             paint: { 'raster-opacity': 0.15 },
           })
 
-          // Capa 2: Precipitación gratuita (Tonos Azules -> Morados)
+          // Capa de Precipitación Libre (Azules a Morados intensos)
           map.addSource('precipitacion', {
             type: 'raster',
             tiles: [`https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${owmKey}`],
@@ -112,27 +112,23 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '100%' }}>
-      {/* Contenedor principal del Mapa */}
       <div ref={mapaRef} style={{ width: '100%', height: '100%', borderRadius: 'inherit' }} />
 
-      {/* Badge SUPERIOR IZQUIERDO: "En vivo" */}
+      {/* BADGE SUPERIOR DE TELEMETRÍA */}
       <div className="absolute top-[10px] left-[10px] z-20 bg-white/90 backdrop-blur-md rounded-lg py-[5px] px-[12px] border border-slate-200 text-[0.72rem] text-slate-600 flex items-center gap-[8px] shadow-sm">
         <span className="w-[7px] h-[7px] bg-emerald-500 rounded-full shadow-[0_0_5px_#10b981]" />
         Precipitación <span className="hidden md:inline">en tiempo real</span>
         <span className="bg-emerald-50 text-emerald-500 text-[0.62rem] font-bold px-[7px] py-[1px] rounded-full">En vivo</span>
       </div>
 
-      {/* LEYENDA INFERIOR DERECHA: Personalizada (Azul -> Morado) */}
+      {/* LEYENDA PREMIUM INTEGRADA */}
       <div className="absolute bottom-[10px] right-[10px] md:bottom-[14px] md:right-[14px] z-20 bg-white/95 backdrop-blur-md rounded-full py-[8px] px-[12px] md:px-[16px] border border-slate-200 shadow-[0_4px_15px_rgba(0,0,0,0.08)] flex items-center gap-[8px] md:gap-[10px]">
         <div className="text-[0.6rem] md:text-[0.65rem] font-bold text-blue-500 flex gap-[4px]">
           Precipitación <span className="text-slate-500 font-semibold hidden md:inline">Ligera</span>
         </div>
-        
-        {/* El Gradiente Mágico que coincide con la API Gratuita */}
         <div className="w-[80px] md:w-[120px] h-[6px] rounded-full" style={{
           background: 'linear-gradient(to right, rgba(167, 192, 255, 0.4), #8ca5ff, #4a6ee0, #5e35b1, #311b92)'
         }} />
-        
         <div className="text-[0.6rem] md:text-[0.65rem] font-semibold text-slate-500">
           Intensa
         </div>
