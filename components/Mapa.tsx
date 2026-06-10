@@ -22,8 +22,6 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
       const maplibregl = (await import('maplibre-gl')).default
       await import('maplibre-gl/dist/maplibre-gl.css')
 
-      const owmKey = process.env.NEXT_PUBLIC_OWM_KEY || ''
-
       const map = new maplibregl.Map({
         container: mapaRef.current!,
         style: {
@@ -33,7 +31,7 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
               type: 'raster',
               tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
               tileSize: 256,
-              attribution: '© OpenStreetMap | Radar: OpenWeatherMap',
+              attribution: '© OpenStreetMap | Satélite: IEM GOES',
             },
           },
           layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
@@ -43,40 +41,30 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
       })
 
       map.on('load', () => {
-        if (owmKey) {
-          // Capa sutil de nubes
-          map.addSource('nubes', {
-            type: 'raster',
-            tiles: [`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${owmKey}`],
-            tileSize: 256,
-          })
-          map.addLayer({
-            id: 'nubes-layer',
-            type: 'raster',
-            source: 'nubes',
-            paint: { 'raster-opacity': 0.15 },
-          })
+        
+        // 🚀 LA MAGIA: Satélite Infrarrojo GOES (Universidad de Iowa)
+        // 100% Gratuito, sin API Keys, sin límite de usuarios.
+        map.addSource('satelite-iem', {
+          type: 'raster',
+          tiles: [
+            'https://mesonet.agron.iastate.edu/cgi-bin/wms/goes/conus_ir.cgi?service=WMS&request=GetMap&version=1.1.1&layers=goes_conus_ir&styles=&format=image/png&transparent=true&width=256&height=256&srs=EPSG:3857&bbox={bbox-epsg-3857}'
+          ],
+          tileSize: 256,
+        })
+        
+        map.addLayer({
+          id: 'satelite-layer',
+          type: 'raster',
+          source: 'satelite-iem',
+          paint: { 'raster-opacity': 0.65 }, // Transparencia para ver las calles abajo
+        })
 
-          // Capa de Precipitación Libre (Azules a Morados intensos)
-          map.addSource('precipitacion', {
-            type: 'raster',
-            tiles: [`https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${owmKey}`],
-            tileSize: 256,
-          })
-          map.addLayer({
-            id: 'precipitacion-layer',
-            type: 'raster',
-            source: 'precipitacion',
-            paint: { 'raster-opacity': 0.85 },
-          })
-        }
-
-        // Marcador interactivo
+        // Tu Marcador interactivo premium
         const el = document.createElement('div')
         el.style.cssText = `
-          width: 18px; height: 18px; background: #2563eb;
+          width: 18px; height: 18px; background: #ef4444;
           border: 3px solid white; border-radius: 50%;
-          box-shadow: 0 0 0 4px rgba(37,99,235,0.35), 0 2px 10px rgba(0,0,0,0.5); cursor: pointer;
+          box-shadow: 0 0 0 4px rgba(239,68,68,0.35), 0 2px 10px rgba(0,0,0,0.5); cursor: pointer;
         `
         const marker = new maplibregl.Marker({ element: el })
           .setLngLat([lng, lat])
@@ -117,20 +105,21 @@ export default function Mapa({ lat, lng, onClickMapa }: MapaProps) {
       {/* BADGE SUPERIOR DE TELEMETRÍA */}
       <div className="absolute top-[10px] left-[10px] z-20 bg-white/90 backdrop-blur-md rounded-lg py-[5px] px-[12px] border border-slate-200 text-[0.72rem] text-slate-600 flex items-center gap-[8px] shadow-sm">
         <span className="w-[7px] h-[7px] bg-emerald-500 rounded-full shadow-[0_0_5px_#10b981]" />
-        Precipitación <span className="hidden md:inline">en tiempo real</span>
+        Capa Satelital <span className="hidden md:inline">GOES</span>
         <span className="bg-emerald-50 text-emerald-500 text-[0.62rem] font-bold px-[7px] py-[1px] rounded-full">En vivo</span>
       </div>
 
       {/* LEYENDA PREMIUM INTEGRADA */}
       <div className="absolute bottom-[10px] right-[10px] md:bottom-[14px] md:right-[14px] z-20 bg-white/95 backdrop-blur-md rounded-full py-[8px] px-[12px] md:px-[16px] border border-slate-200 shadow-[0_4px_15px_rgba(0,0,0,0.08)] flex items-center gap-[8px] md:gap-[10px]">
-        <div className="text-[0.6rem] md:text-[0.65rem] font-bold text-blue-500 flex gap-[4px]">
-          Precipitación <span className="text-slate-500 font-semibold hidden md:inline">Ligera</span>
+        <div className="text-[0.6rem] md:text-[0.65rem] font-bold text-slate-600 flex gap-[4px]">
+          Nubes <span className="text-slate-400 font-semibold hidden md:inline">Ligeras</span>
         </div>
         <div className="w-[80px] md:w-[120px] h-[6px] rounded-full" style={{
-          background: 'linear-gradient(to right, rgba(167, 192, 255, 0.4), #8ca5ff, #4a6ee0, #5e35b1, #311b92)'
+          // Colores de la escala termal del satélite
+          background: 'linear-gradient(to right, rgba(255,255,255,0.2), #ffffff, #ffff00, #ff9900, #ff0000)'
         }} />
-        <div className="text-[0.6rem] md:text-[0.65rem] font-semibold text-slate-500">
-          Intensa
+        <div className="text-[0.6rem] md:text-[0.65rem] font-semibold text-slate-600">
+          Tormenta
         </div>
       </div>
     </div>
